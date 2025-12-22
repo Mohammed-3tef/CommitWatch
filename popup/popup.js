@@ -402,6 +402,9 @@ async function init() {
   // Initialize theme first to prevent flash
   await initTheme();
   
+  // Clear the badge when popup opens
+  await sendMessage({ action: 'clearBadge' });
+  
   showView('loading');
   
   // Set up event listeners

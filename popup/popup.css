@@ -164,6 +164,13 @@ body {
 .logo h1 {
   font-size: 16px;
   font-weight: 600;
+  margin-bottom: 0;
+}
+
+.logo .subtitle {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
 }
 
 .header-actions {

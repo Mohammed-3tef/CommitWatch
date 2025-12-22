@@ -43,6 +43,50 @@ async function setStorage(data) {
   return chrome.storage.local.set(data);
 }
 
+// =============================================================================
+// BADGE UTILITIES
+// =============================================================================
+
+/**
+ * Update the extension badge with unread count
+ * @param {number} count - Number of unread notifications/commits
+ */
+async function updateBadge(count) {
+  if (count > 0) {
+    await chrome.action.setBadgeText({ text: count > 99 ? '99+' : String(count) });
+    await chrome.action.setBadgeBackgroundColor({ color: '#f85149' }); // Red color
+  } else {
+    await chrome.action.setBadgeText({ text: '' });
+  }
+}
+
+/**
+ * Get the current unread count and update badge
+ */
+async function refreshBadge() {
+  const { unreadCount = 0 } = await getStorage('unreadCount');
+  await updateBadge(unreadCount);
+}
+
+/**
+ * Increment unread count and update badge
+ * @param {number} increment - Number to add to unread count
+ */
+async function incrementUnreadCount(increment = 1) {
+  const { unreadCount = 0 } = await getStorage('unreadCount');
+  const newCount = unreadCount + increment;
+  await setStorage({ unreadCount: newCount });
+  await updateBadge(newCount);
+}
+
+/**
+ * Clear unread count and badge
+ */
+async function clearUnreadCount() {
+  await setStorage({ unreadCount: 0 });
+  await updateBadge(0);
+}
+
 /**
  * Get user settings with defaults
  * @returns {Promise<Object>} User settings
@@ -533,6 +577,11 @@ async function checkAllRepositoriesForCommits() {
       await sendCommitNotification(repo, commit, priority);
     }
     
+    // Update badge with new commit count
+    if (newCommits.length > 0) {
+      await incrementUnreadCount(newCommits.length);
+    }
+    
     // Update last check time
     await setStorage({ lastCheckTime: Date.now() });
     
@@ -842,6 +891,10 @@ async function handleMessage(message) {
         const settings = await getSettings();
         return { success: true, settings };
         
+      case 'clearBadge':
+        await clearUnreadCount();
+        return { success: true };
+        
       default:
         return { success: false, error: 'Unknown action' };
     }
@@ -888,6 +941,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
  */
 chrome.runtime.onStartup.addListener(async () => {
   console.log('[Commit Watch] Extension started');
+  
+  // Refresh badge on startup
+  await refreshBadge();
   
   // Resume polling if authenticated
   if (await isAuthenticated()) {
