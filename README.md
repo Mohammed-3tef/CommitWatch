@@ -35,18 +35,13 @@ A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories
 2. A GitHub account
 3. A GitHub Personal Access Token (PAT)
 
-### Step 1: Generate Icon Files
-1. Open `icons/generate-icons.html` in your browser
-2. Click "Download All Icons"
-3. Save `icon16.png`, `icon48.png`, and `icon128.png` to the `icons/` folder
-
-### Step 2: Load the Extension
+### Step 1: Load the Extension
 1. Open Chrome and navigate to `chrome://extensions`
 2. Enable **Developer mode** (toggle in top-right corner)
 3. Click **Load unpacked**
 4. Select the `CommitWatch` folder
 
-### Step 3: Configure Authentication
+### Step 2: Configure Authentication
 1. Click the Commit Watch extension icon
 2. Go to **Settings** (gear icon)
 3. Generate a GitHub Personal Access Token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new) with these scopes:
@@ -114,20 +109,6 @@ CommitWatch/
 - The extension tracks remaining quota via response headers
 - Responses are cached to minimize redundant requests
 - Rate limit info is displayed in the popup
-
-### Commit Priority Algorithm
-```javascript
-// High Priority
-- Contains: fix, hotfix, breaking, critical, urgent, security
-- Author is repository owner on default branch
-
-// Low Priority
-- Contains: merge, docs, documentation, format, formatting, style, chore
-- Is a merge commit (message starts with "Merge")
-
-// Medium Priority
-- Everything else
-```
 
 ## 🛠️ Development
 
