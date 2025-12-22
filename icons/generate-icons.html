@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commit Watch - Icon Generator</title>
+  <!-- Add Icon -->
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #0d1117;
+      color: #c9d1d9;
+    }
+    
+    h1 { 
+      color: white;
+      font-size: clamp(1.5rem, 5vw, 2rem);
+    }
+    
+    h2 { 
+      color: whitesmoke; 
+      font-size: clamp(1rem, 4vw, 1.125rem);
+      margin-top: 20px;
+      margin-bottom: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .theme-section {
+      background: #161b22;
+      padding: 15px 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    
+    .theme-section.light {
+      background: #f6f8fa;
+      border: 1px solid #d0d7de;
+    }
+    
+    .theme-section.light h2 {
+      color: #1f2328;
+    }
+    
+    .theme-section.light p {
+      color: #656d76;
+    }
+    
+    .icon-container {
+      display: flex;
+      gap: 20px;
+      align-items: flex-end;
+      margin: 20px 0;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    
+    .icon-box {
+      text-align: center;
+      flex: 0 0 auto;
+    }
+    
+    .icon-box img {
+      display: block;
+      margin: 0 auto;
+    }
+    
+    .icon-box p {
+      margin-top: 10px;
+      margin-bottom: 8px;
+      font-size: 14px;
+      color: #8b949e;
+    }
+    
+    button {
+      background: #2ea44f;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+      transition: background 0.2s;
+    }
+    
+    button:hover {
+      background: #22863a;
+    }
+    
+    button:active {
+      transform: scale(0.98);
+    }
+    
+    .theme-buttons {
+      text-align: center;
+      margin-top: 15px;
+    }
+    
+    .instructions {
+      background: #161b22;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 30px;
+    }
+    
+    .instructions h3 {
+      margin-top: 0;
+    }
+    
+    .instructions ol {
+      padding-left: 20px;
+    }
+    
+    .instructions li {
+      margin-bottom: 10px;
+    }
+    
+    code {
+      background: #21262d;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+    
+    .download-all-section {
+      margin-top: 30px;
+      text-align: center;
+    }
+    
+    .download-all-btn {
+      padding: 15px 30px;
+      font-size: 16px;
+      width: 100%;
+      max-width: 350px;
+    }
+    
+    /* Responsive */
+    @media (max-width: 600px) {
+      body {
+        padding: 15px;
+      }
+      
+      .theme-section {
+        padding: 15px;
+      }
+      
+      .icon-container {
+        gap: 15px;
+      }
+      
+      button {
+        padding: 8px 16px;
+        font-size: 13px;
+      }
+      
+      .download-all-btn {
+        padding: 12px 20px;
+        font-size: 14px;
+      }
+    }
+    
+    @media (max-width: 400px) {
+      .icon-container {
+        flex-direction: column;
+        align-items: center;
+      }
+      
+      .icon-box {
+        width: 100%;
+        padding: 10px;
+        background: rgba(255,255,255,0.05);
+        border-radius: 8px;
+      }
+      
+      .theme-section.light .icon-box {
+        background: rgba(0,0,0,0.03);
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Commit Watch Icon Generator</h1>
+  <p>Generate PNG icons for the Chrome extension in both dark and light themes.</p>
+  
+  <!-- Dark Theme Icons -->
+  <div class="theme-section">
+    <h2>Dark Theme Icons</h2>
+    <p>GitHub logo - for dark mode UI</p>
+    <div class="icon-container">
+      <div class="icon-box">
+        <img id="dark-icon16" width="16" height="16">
+        <p>16x16</p>
+        <button onclick="downloadIcon('dark', 16)">Download</button>
+      </div>
+      <div class="icon-box">
+        <img id="dark-icon48" width="48" height="48">
+        <p>48x48</p>
+        <button onclick="downloadIcon('dark', 48)">Download</button>
+      </div>
+      <div class="icon-box">
+        <img id="dark-icon128" width="128" height="128">
+        <p>128x128</p>
+        <button onclick="downloadIcon('dark', 128)">Download</button>
+      </div>
+    </div>
+    <div class="theme-buttons">
+      <button onclick="downloadTheme('dark')">Download All Dark Icons</button>
+    </div>
+  </div>
+  
+  <!-- Light Theme Icons -->
+  <div class="theme-section light">
+    <h2>Light Theme Icons</h2>
+    <p>GitHub logo - optimized for light mode UI</p>
+    <div class="icon-container">
+      <div class="icon-box">
+        <img id="light-icon16" width="16" height="16">
+        <p>16x16</p>
+        <button onclick="downloadIcon('light', 16)">Download</button>
+      </div>
+      <div class="icon-box">
+        <img id="light-icon48" width="48" height="48">
+        <p>48x48</p>
+        <button onclick="downloadIcon('light', 48)">Download</button>
+      </div>
+      <div class="icon-box">
+        <img id="light-icon128" width="128" height="128">
+        <p>128x128</p>
+        <button onclick="downloadIcon('light', 128)">Download</button>
+      </div>
+    </div>
+    <div class="theme-buttons">
+      <button onclick="downloadTheme('light')">Download All Light Icons</button>
+    </div>
+  </div>
+  
+  <div class="download-all-section">
+    <button class="download-all-btn" onclick="downloadAll()">
+      Download All Icons (Both Themes)
+    </button>
+  </div>
+  
+  <div class="instructions">
+    <h3>Instructions:</h3>
+    <ol>
+      <li>Click "Download All Icons (Both Themes)" to get all icon sizes</li>
+      <li>Save the dark theme icons to the <code>icons/</code> folder as:
+        <ul>
+          <li><code>icon16.png</code></li>
+          <li><code>icon48.png</code></li>
+          <li><code>icon128.png</code></li>
+        </ul>
+      </li>
+      <li>(Optional) Save light theme icons if you want to use them:
+        <ul>
+          <li><code>icon16-light.png</code></li>
+          <li><code>icon48-light.png</code></li>
+          <li><code>icon128-light.png</code></li>
+        </ul>
+      </li>
+      <li>The extension is now ready to load in Chrome!</li>
+    </ol>
+    <p style="margin-top: 15px; color: #8b949e;">
+      <strong>Note:</strong> The extension uses the same icons for both themes by default. 
+      The dark/light icons here are just for preview on different backgrounds.
+    </p>
+  </div>
+
+  <!-- Footer -->
+  <footer style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #30363d; text-align: center;">
+    <p style="font-size: 12px; color: #8b949e; margin: 0;">&copy; 2025 Mohammed Atef. All rights reserved.</p>
+  </footer>
+
+  <script>
+    // SVG content embedded as data URIs to avoid CORS issues
+    const svgData = {
+      // Dark icon - white GitHub logo (for dark backgrounds)
+      dark: `<svg width="128" height="128" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" fill="#fff"/></svg>`,
+      // Light icon - dark GitHub logo (for light backgrounds)
+      light: `<svg width="128" height="128" viewBox="0 0 98 96" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" clip-rule="evenodd" d="M48.854 0C21.839 0 0 22 0 49.217c0 21.756 13.993 40.172 33.405 46.69 2.427.49 3.316-1.059 3.316-2.362 0-1.141-.08-5.052-.08-9.127-13.59 2.934-16.42-5.867-16.42-5.867-2.184-5.704-5.42-7.17-5.42-7.17-4.448-3.015.324-3.015.324-3.015 4.934.326 7.523 5.052 7.523 5.052 4.367 7.496 11.404 5.378 14.235 4.074.404-3.178 1.699-5.378 3.074-6.6-10.839-1.141-22.243-5.378-22.243-24.283 0-5.378 1.94-9.778 5.014-13.2-.485-1.222-2.184-6.275.486-13.038 0 0 4.125-1.304 13.426 5.052a46.97 46.97 0 0 1 12.214-1.63c4.125 0 8.33.571 12.213 1.63 9.302-6.356 13.427-5.052 13.427-5.052 2.67 6.763.97 11.816.485 13.038 3.155 3.422 5.015 7.822 5.015 13.2 0 18.905-11.404 23.06-22.324 24.283 1.78 1.548 3.316 4.481 3.316 9.126 0 6.6-.08 11.897-.08 13.526 0 1.304.89 2.853 3.316 2.364 19.412-6.52 33.405-24.935 33.405-46.691C97.707 22 75.788 0 48.854 0z" fill="#24292f"/></svg>`
+    };
+    
+    // Convert SVG to data URI
+    function svgToDataUri(svg) {
+      return 'data:image/svg+xml;base64,' + btoa(svg);
+    }
+    
+    // Initialize images with embedded SVG data
+    function init() {
+      const sizes = [16, 48, 128];
+      ['dark', 'light'].forEach(theme => {
+        sizes.forEach(size => {
+          const img = document.getElementById(`${theme}-icon${size}`);
+          if (img) {
+            img.src = svgToDataUri(svgData[theme]);
+          }
+        });
+      });
+    }
+    
+    // Download icon as PNG
+    function downloadIcon(theme, size) {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      
+      const img = new Image();
+      img.onload = function() {
+        ctx.drawImage(img, 0, 0, size, size);
+        const suffix = theme === 'light' ? '-light' : '';
+        const link = document.createElement('a');
+        link.download = `icon${size}${suffix}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+      img.src = svgToDataUri(svgData[theme]);
+    }
+    
+    // Download all icons for a specific theme
+    function downloadTheme(theme) {
+      downloadIcon(theme, 16);
+      setTimeout(() => downloadIcon(theme, 48), 200);
+      setTimeout(() => downloadIcon(theme, 128), 400);
+    }
+    
+    // Download all icons for both themes
+    function downloadAll() {
+      const sizes = [16, 48, 128];
+      let delay = 0;
+      
+      // Dark theme icons (main icons without suffix)
+      sizes.forEach((size) => {
+        setTimeout(() => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          
+          const img = new Image();
+          img.onload = function() {
+            ctx.drawImage(img, 0, 0, size, size);
+            const link = document.createElement('a');
+            link.download = `icon${size}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+          };
+          img.src = svgToDataUri(svgData.dark);
+        }, delay);
+        delay += 200;
+      });
+      
+      // Light theme icons (with -light suffix)
+      sizes.forEach((size) => {
+        setTimeout(() => {
+          downloadIcon('light', size);
+        }, delay);
+        delay += 200;
+      });
+    }
+    
+    // Initialize on page load
+    init();
+  </script>
+</body>
+</html>

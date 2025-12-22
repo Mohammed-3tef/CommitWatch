@@ -1,0 +1,584 @@
+/**
+ * Commit Watch - Popup Styles
+ * 
+ * Clean, modern UI for the extension popup
+ * Uses CSS custom properties for theming
+ */
+
+/* =============================================================================
+   CSS VARIABLES
+   ============================================================================= */
+
+:root {
+  /* Colors */
+  --color-primary: #2ea44f;
+  --color-primary-hover: #22863a;
+  --color-secondary: #6e7681;
+  --color-background: #0d1117;
+  --color-surface: #161b22;
+  --color-surface-hover: #21262d;
+  --color-border: #30363d;
+  --color-text: #c9d1d9;
+  --color-text-muted: #8b949e;
+  --color-text-link: #58a6ff;
+  --color-error: #f85149;
+  --color-warning: #d29922;
+  --color-success: #3fb950;
+  
+  /* Priority colors */
+  --color-priority-high: #f85149;
+  --color-priority-medium: #d29922;
+  --color-priority-low: #3fb950;
+  
+  /* Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 24px;
+  
+  /* Border radius */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  
+  /* Transitions */
+  --transition-fast: 150ms ease;
+  --transition-normal: 250ms ease;
+}
+
+/* Light mode theme */
+[data-theme="light"] {
+  --color-primary: #2ea44f;
+  --color-primary-hover: #22863a;
+  --color-secondary: #57606a;
+  --color-background: #ffffff;
+  --color-surface: #f6f8fa;
+  --color-surface-hover: #eaeef2;
+  --color-border: #d0d7de;
+  --color-text: #1f2328;
+  --color-text-muted: #656d76;
+  --color-text-link: #0969da;
+  --color-error: #cf222e;
+  --color-warning: #9a6700;
+  --color-success: #1a7f37;
+  
+  /* Priority colors - slightly adjusted for light mode */
+  --color-priority-high: #cf222e;
+  --color-priority-medium: #9a6700;
+  --color-priority-low: #1a7f37;
+}
+
+/* Auto detect system preference */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --color-primary: #2ea44f;
+    --color-primary-hover: #22863a;
+    --color-secondary: #57606a;
+    --color-background: #ffffff;
+    --color-surface: #f6f8fa;
+    --color-surface-hover: #eaeef2;
+    --color-border: #d0d7de;
+    --color-text: #1f2328;
+    --color-text-muted: #656d76;
+    --color-text-link: #0969da;
+    --color-error: #cf222e;
+    --color-warning: #9a6700;
+    --color-success: #1a7f37;
+    --color-priority-high: #cf222e;
+    --color-priority-medium: #9a6700;
+    --color-priority-low: #1a7f37;
+  }
+}
+
+/* =============================================================================
+   BASE STYLES
+   ============================================================================= */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--color-text);
+  background-color: var(--color-background);
+  min-width: 360px;
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.popup-container {
+  padding: var(--spacing-md);
+}
+
+/* =============================================================================
+   FOOTER
+   ============================================================================= */
+
+.footer {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-border);
+  text-align: center;
+}
+
+.footer p {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* =============================================================================
+   HEADER
+   ============================================================================= */
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  color: var(--color-text);
+}
+
+.logo svg {
+  color: var(--color-primary);
+}
+
+.logo h1 {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Theme toggle icon visibility */
+.icon-sun {
+  display: none;
+}
+
+.icon-moon {
+  display: block;
+}
+
+[data-theme="light"] .icon-sun {
+  display: block;
+}
+
+[data-theme="light"] .icon-moon {
+  display: none;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .icon-sun {
+    display: block;
+  }
+  
+  :root:not([data-theme="dark"]) .icon-moon {
+    display: none;
+  }
+}
+
+/* =============================================================================
+   BUTTONS
+   ============================================================================= */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: #fff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-primary-hover);
+}
+
+.btn-secondary {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-surface-hover);
+}
+
+.btn-small {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 12px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.icon-btn:hover {
+  background-color: var(--color-surface-hover);
+  color: var(--color-text);
+}
+
+/* =============================================================================
+   LOGIN VIEW
+   ============================================================================= */
+
+.login-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--spacing-lg) 0;
+}
+
+.github-icon {
+  color: var(--color-text);
+  margin-bottom: var(--spacing-lg);
+}
+
+.login-content h2 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: var(--spacing-sm);
+}
+
+.login-content p {
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+  max-width: 280px;
+}
+
+.token-input-group {
+  display: flex;
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+  gap: var(--spacing-xs);
+}
+
+.token-input-group input {
+  flex: 1;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.token-input-group input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(46, 164, 79, 0.2);
+}
+
+.token-input-group input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.login-content .btn-primary {
+  width: 100%;
+  margin-bottom: var(--spacing-md);
+}
+
+.help-link {
+  color: var(--color-text-link);
+  text-decoration: none;
+  font-size: 12px;
+}
+
+.help-link:hover {
+  text-decoration: underline;
+}
+
+/* =============================================================================
+   MAIN VIEW
+   ============================================================================= */
+
+.status-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+}
+
+.user-info span {
+  font-weight: 500;
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--spacing-md);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.stat-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Actions */
+.actions {
+  margin-bottom: var(--spacing-md);
+}
+
+/* Last Check */
+.last-check {
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* =============================================================================
+   ACTIVITY SECTION
+   ============================================================================= */
+
+.activity-section h3 {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacing-sm);
+}
+
+.activity-list {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: var(--spacing-xl);
+}
+
+.activity-item {
+  display: block;
+  padding: var(--spacing-sm) var(--spacing-md);
+  margin-bottom: var(--spacing-xs);
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: all var(--transition-fast);
+}
+
+.activity-item:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-text-muted);
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-xs);
+}
+
+.activity-repo {
+  font-weight: 500;
+  color: var(--color-text-link);
+  font-size: 12px;
+}
+
+.activity-time {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.activity-message {
+  font-size: 13px;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-xs);
+}
+
+.priority-indicator {
+  margin-right: var(--spacing-xs);
+}
+
+.activity-author {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+/* Priority-specific styles */
+.activity-item.priority-high {
+  border-left: 3px solid var(--color-priority-high);
+}
+
+.activity-item.priority-medium {
+  border-left: 3px solid var(--color-priority-medium);
+}
+
+.activity-item.priority-low {
+  border-left: 3px solid var(--color-priority-low);
+}
+
+/* =============================================================================
+   LOADING STATE
+   ============================================================================= */
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  gap: var(--spacing-md);
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--color-border);
+  border-top-color: var(--color-primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spinning {
+  animation: spin 0.8s linear infinite;
+}
+
+/* =============================================================================
+   ERROR MESSAGE
+   ============================================================================= */
+
+.error-message {
+  position: fixed;
+  bottom: var(--spacing-md);
+  left: var(--spacing-md);
+  right: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-error);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  text-align: center;
+  animation: slideUp var(--transition-normal);
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* =============================================================================
+   SCROLLBAR STYLES
+   ============================================================================= */
+
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}

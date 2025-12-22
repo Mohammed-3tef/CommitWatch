@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Commit Watch",
+  "version": "1.0.0",
+  "description": "Intelligently monitors GitHub repositories and notifies you about important commits and activity.",
+  
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "identity"
+  ],
+  
+  "host_permissions": [
+    "https://api.github.com/*",
+    "https://github.com/*"
+  ],
+  
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Commit Watch"
+  },
+  
+  "options_page": "options/options.html",
+  
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  
+  "oauth2": {
+    "client_id": "YOUR_GITHUB_OAUTH_CLIENT_ID",
+    "scopes": ["repo", "read:user", "notifications"]
+  }
+}

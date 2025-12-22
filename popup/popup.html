@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Commit Watch</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <img id="logo-img" src="../icons/icon48.png" alt="Commit Watch Logo" />
+        <h1>Commit Watch</h1>
+      </div>
+      <div class="header-actions">
+        <button id="theme-toggle-btn" class="icon-btn" title="Toggle theme">
+          <svg class="icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="5"/>
+            <line x1="12" y1="1" x2="12" y2="3"/>
+            <line x1="12" y1="21" x2="12" y2="23"/>
+            <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+            <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+            <line x1="1" y1="12" x2="3" y2="12"/>
+            <line x1="21" y1="12" x2="23" y2="12"/>
+            <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+            <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+          </svg>
+          <svg class="icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+        <button id="settings-btn" class="icon-btn" title="Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Login View (shown when not authenticated) -->
+    <section id="login-view" class="view hidden">
+      <div class="login-content">
+        <div class="github-icon">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+        </div>
+        <h2>Connect to GitHub</h2>
+        <p>Enter your GitHub Personal Access Token to start monitoring your repositories.</p>
+        <div class="token-input-group">
+          <input type="password" id="token-input" placeholder="ghp_xxxxxxxxxxxx" />
+          <button id="show-token-btn" class="icon-btn" title="Show/Hide token">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+          </button>
+        </div>
+        <button id="login-btn" class="btn btn-primary">
+          <span>Connect</span>
+        </button>
+        <a href="https://github.com/settings/tokens/new?scopes=repo,read:user,notifications&description=Commit%20Watch%20Extension" 
+           target="_blank" class="help-link">
+          Generate a token →
+        </a>
+      </div>
+    </section>
+
+    <!-- Main View (shown when authenticated) -->
+    <section id="main-view" class="view hidden">
+      <!-- Status Bar -->
+      <div class="status-bar">
+        <div class="user-info">
+          <img id="user-avatar" src="" alt="Avatar" class="avatar" />
+          <span id="user-name"></span>
+        </div>
+        <button id="logout-btn" class="btn btn-small btn-secondary">Logout</button>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-value" id="repo-count">0</span>
+          <span class="stat-label">Repositories</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="commit-count">0</span>
+          <span class="stat-label">New Commits</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="rate-limit">-</span>
+          <span class="stat-label">API Calls Left</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <button id="check-now-btn" class="btn btn-primary btn-block">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/>
+          </svg>
+          <span>Check Now</span>
+        </button>
+      </div>
+
+      <!-- Last Check Info -->
+      <div class="last-check">
+        <span id="last-check-time">Never checked</span>
+      </div>
+
+      <!-- Recent Activity -->
+      <div class="activity-section">
+        <h3>Recent Activity</h3>
+        <div id="activity-list" class="activity-list">
+          <p class="empty-state">No recent commits</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Loading State -->
+    <div id="loading" class="loading hidden">
+      <div class="spinner"></div>
+      <span>Loading...</span>
+    </div>
+
+    <!-- Error Message -->
+    <div id="error-message" class="error-message hidden"></div>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>&copy; 2025 Mohammed Atef. All rights reserved.</p>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
