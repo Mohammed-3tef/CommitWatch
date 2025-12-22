@@ -134,6 +134,15 @@ body {
   margin: 0;
 }
 
+.footer a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
 .hidden {
   display: none !important;
 }
