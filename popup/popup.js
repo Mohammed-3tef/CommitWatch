@@ -418,6 +418,9 @@ async function init() {
   elements.settingsBtn.addEventListener('click', handleOpenSettings);
   elements.themeToggleBtn.addEventListener('click', toggleTheme);
   
+  // Keyboard shortcuts for popup
+  document.addEventListener('keydown', handleKeyboardShortcuts);
+  
   // Check authentication status and update view
   try {
     const status = await sendMessage({ action: 'getStatus' });
@@ -430,6 +433,64 @@ async function init() {
   } catch (error) {
     console.error('Init error:', error);
     showView('login');
+  }
+}
+
+/**
+ * Handle keyboard shortcuts within the popup
+ * @param {KeyboardEvent} event - Keyboard event
+ */
+function handleKeyboardShortcuts(event) {
+  // Don't trigger shortcuts when typing in input fields
+  if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+    return;
+  }
+  
+  // Check if main view is visible (authenticated)
+  const isMainViewVisible = !elements.mainView.classList.contains('hidden');
+  
+  switch (event.key.toLowerCase()) {
+    case 'r':
+      // R - Refresh / Check now
+      if (isMainViewVisible && !elements.checkNowBtn.disabled) {
+        event.preventDefault();
+        handleCheckNow();
+      }
+      break;
+      
+    case 'm':
+      // M - Mark all as read
+      if (isMainViewVisible) {
+        event.preventDefault();
+        sendMessage({ action: 'clearBadge' });
+      }
+      break;
+      
+    case 's':
+      // S - Open settings
+      event.preventDefault();
+      handleOpenSettings();
+      break;
+      
+    case 't':
+      // T - Toggle theme
+      event.preventDefault();
+      toggleTheme();
+      break;
+      
+    case 'escape':
+      // Escape - Close popup
+      event.preventDefault();
+      window.close();
+      break;
+      
+    case 'l':
+      // L - Logout (when authenticated)
+      if (isMainViewVisible) {
+        event.preventDefault();
+        handleLogout();
+      }
+      break;
   }
 }
 

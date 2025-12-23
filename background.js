@@ -99,6 +99,7 @@ async function getSettings() {
     ignoreOwnCommits: false,
     enabledRepos: {}, // { 'owner/repo': true/false }
     notificationsEnabled: true,
+    releaseNotificationsEnabled: true, // Monitor new releases/tags
     ...settings
   };
 }
@@ -596,6 +597,193 @@ async function checkAllRepositoriesForCommits() {
 }
 
 // =============================================================================
+// RELEASE MONITORING
+// =============================================================================
+
+/**
+ * Fetch the latest release for a repository
+ * 
+ * @param {Object} repo - Repository object
+ * @returns {Promise<Object|null>} Latest release or null
+ */
+async function fetchLatestRelease(repo) {
+  try {
+    const response = await fetchGitHub(
+      `/repos/${repo.full_name}/releases/latest`
+    );
+    
+    if (!response.ok) {
+      // 404 means no releases exist
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch releases: ${response.status}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching releases for ${repo.full_name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Check a single repository for new releases
+ * 
+ * @param {Object} repo - Repository to check
+ * @param {Object} lastReleases - Object containing last known release IDs
+ * @param {Object} settings - User settings
+ * @returns {Promise<Object|null>} New release info or null
+ */
+async function checkRepoForNewReleases(repo, lastReleases, settings) {
+  // Skip if repo is disabled in settings
+  if (settings.enabledRepos[repo.full_name] === false) {
+    return null;
+  }
+  
+  const latestRelease = await fetchLatestRelease(repo);
+  
+  if (!latestRelease) {
+    return null;
+  }
+  
+  const lastKnownId = lastReleases[repo.full_name];
+  
+  // If this is the first check, just store the ID
+  if (!lastKnownId) {
+    return { repo, release: latestRelease, isNew: false };
+  }
+  
+  // Check if there's a new release
+  if (latestRelease.id !== lastKnownId) {
+    return {
+      repo,
+      release: latestRelease,
+      isNew: true
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Check all repositories for new releases
+ */
+async function checkAllRepositoriesForReleases() {
+  console.log('[Commit Watch] Starting release check...');
+  
+  try {
+    const settings = await getSettings();
+    
+    if (!settings.notificationsEnabled || !settings.releaseNotificationsEnabled) {
+      console.log('[Commit Watch] Release notifications disabled, skipping check');
+      return;
+    }
+    
+    // Get repositories
+    const repos = await getRepositories();
+    
+    // Get last known releases
+    const { lastReleases = {} } = await getStorage('lastReleases');
+    
+    // Track new releases for batch update
+    const newReleases = [];
+    const updatedLastReleases = { ...lastReleases };
+    
+    // Check each repository (with rate limiting consideration)
+    // Process in batches to avoid rate limits
+    const batchSize = 10;
+    for (let i = 0; i < repos.length; i += batchSize) {
+      const batch = repos.slice(i, i + batchSize);
+      
+      const results = await Promise.all(
+        batch.map(repo => checkRepoForNewReleases(repo, lastReleases, settings))
+      );
+      
+      for (const result of results) {
+        if (result) {
+          // Update last known release
+          updatedLastReleases[result.repo.full_name] = result.release.id;
+          
+          // Track new releases for notification
+          if (result.isNew) {
+            newReleases.push(result);
+          }
+        }
+      }
+      
+      // Small delay between batches to be nice to the API
+      if (i + batchSize < repos.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+    }
+    
+    // Store updated release IDs
+    await setStorage({ lastReleases: updatedLastReleases });
+    
+    // Send notifications for new releases
+    for (const { repo, release } of newReleases) {
+      await sendReleaseNotification(repo, release);
+    }
+    
+    // Update badge with new release count
+    if (newReleases.length > 0) {
+      await incrementUnreadCount(newReleases.length);
+    }
+    
+    console.log(`[Commit Watch] Release check complete. Found ${newReleases.length} new releases.`);
+    
+  } catch (error) {
+    console.error('[Commit Watch] Error during release check:', error);
+  }
+}
+
+/**
+ * Send Chrome notification for a new release
+ * 
+ * @param {Object} repo - Repository object
+ * @param {Object} release - Release object
+ */
+async function sendReleaseNotification(repo, release) {
+  const settings = await getSettings();
+  
+  if (!settings.notificationsEnabled || !settings.releaseNotificationsEnabled) return;
+  
+  const notificationId = `release-${repo.full_name}-${release.id}`;
+  const tagName = release.tag_name || 'Unknown';
+  const releaseName = release.name || tagName;
+  const isPrerelease = release.prerelease;
+  
+  await chrome.notifications.create(notificationId, {
+    type: 'basic',
+    iconUrl: 'icons/icon128.png',
+    title: `🏷️ New Release: ${repo.full_name}`,
+    message: `${releaseName}${isPrerelease ? ' (Pre-release)' : ''}`,
+    contextMessage: `Version ${tagName}`,
+    priority: 2,
+    requireInteraction: true
+  });
+  
+  // Store notification for history
+  const { notificationHistory = [] } = await getStorage('notificationHistory');
+  notificationHistory.unshift({
+    id: notificationId,
+    type: 'release',
+    repo: repo.full_name,
+    tagName,
+    releaseName,
+    isPrerelease,
+    url: release.html_url,
+    timestamp: Date.now()
+  });
+  
+  // Keep last 100 notifications
+  await setStorage({ 
+    notificationHistory: notificationHistory.slice(0, 100) 
+  });
+}
+
+// =============================================================================
 // GITHUB NOTIFICATIONS
 // =============================================================================
 
@@ -788,6 +976,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     // Check if still authenticated
     if (await isAuthenticated()) {
       await checkAllRepositoriesForCommits();
+      await checkAllRepositoriesForReleases();
       await checkGitHubNotifications();
     } else {
       console.log('[Commit Watch] Not authenticated, stopping polling');
@@ -922,7 +1111,8 @@ chrome.runtime.onInstalled.addListener(async (details) => {
         ignoreForks: true,
         ignoreOwnCommits: false,
         enabledRepos: {},
-        notificationsEnabled: true
+        notificationsEnabled: true,
+        releaseNotificationsEnabled: true
       }
     });
     
@@ -948,5 +1138,48 @@ chrome.runtime.onStartup.addListener(async () => {
   // Resume polling if authenticated
   if (await isAuthenticated()) {
     await startPolling();
+  }
+});
+
+// =============================================================================
+// KEYBOARD SHORTCUTS (COMMANDS)
+// =============================================================================
+
+/**
+ * Handle keyboard shortcut commands
+ */
+chrome.commands.onCommand.addListener(async (command) => {
+  console.log('[Commit Watch] Command received:', command);
+  
+  switch (command) {
+    case 'check-now':
+      // Check for new commits immediately
+      if (await isAuthenticated()) {
+        await checkAllRepositoriesForCommits();
+        await checkAllRepositoriesForReleases();
+        await checkGitHubNotifications();
+        
+        // Show notification that check completed
+        await chrome.notifications.create('check-complete', {
+          type: 'basic',
+          iconUrl: 'icons/icon128.png',
+          title: 'Commit Watch',
+          message: 'Check complete!',
+          priority: 0
+        });
+      }
+      break;
+      
+    case 'mark-all-read':
+      // Clear all unread notifications
+      await clearUnreadCount();
+      await chrome.notifications.create('marked-read', {
+        type: 'basic',
+        iconUrl: 'icons/icon128.png',
+        title: 'Commit Watch',
+        message: 'All notifications marked as read',
+        priority: 0
+      });
+      break;
   }
 });

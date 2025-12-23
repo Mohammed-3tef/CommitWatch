@@ -22,6 +22,7 @@ const elements = {
   
   // Settings elements
   notificationsEnabled: document.getElementById('notifications-enabled'),
+  releaseNotifications: document.getElementById('release-notifications'),
   checkInterval: document.getElementById('check-interval'),
   ignoreForks: document.getElementById('ignore-forks'),
   ignoreOwn: document.getElementById('ignore-own'),
@@ -270,6 +271,7 @@ async function loadSettings() {
       const settings = response.settings;
       
       elements.notificationsEnabled.checked = settings.notificationsEnabled !== false;
+      elements.releaseNotifications.checked = settings.releaseNotificationsEnabled !== false;
       elements.checkInterval.value = settings.checkInterval || 5;
       elements.ignoreForks.checked = settings.ignoreForks !== false;
       elements.ignoreOwn.checked = settings.ignoreOwnCommits === true;
@@ -544,6 +546,10 @@ function initEventListeners() {
   // Settings
   elements.notificationsEnabled.addEventListener('change', (e) => {
     saveSetting('notificationsEnabled', e.target.checked);
+  });
+  
+  elements.releaseNotifications.addEventListener('change', (e) => {
+    saveSetting('releaseNotificationsEnabled', e.target.checked);
   });
   
   elements.checkInterval.addEventListener('change', (e) => {

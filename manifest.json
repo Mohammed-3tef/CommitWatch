@@ -42,5 +42,29 @@
   "oauth2": {
     "client_id": "YOUR_GITHUB_OAUTH_CLIENT_ID",
     "scopes": ["repo", "read:user", "notifications"]
+  },
+  
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Alt+Shift+C",
+        "mac": "Alt+Shift+C"
+      },
+      "description": "Open Commit Watch popup"
+    },
+    "check-now": {
+      "suggested_key": {
+        "default": "Alt+Shift+R",
+        "mac": "Alt+Shift+R"
+      },
+      "description": "Check for new commits now"
+    },
+    "mark-all-read": {
+      "suggested_key": {
+        "default": "Alt+Shift+M",
+        "mac": "Alt+Shift+M"
+      },
+      "description": "Mark all notifications as read"
+    }
   }
 }

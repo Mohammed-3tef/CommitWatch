@@ -1006,3 +1006,94 @@ input::placeholder {
     font-size: 11px;
   }
 }
+
+/* =============================================================================
+   KEYBOARD SHORTCUTS SECTION
+   ============================================================================= */
+
+.shortcuts-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.shortcuts-group {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+}
+
+.shortcuts-group h4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shortcut-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-sm) 0;
+}
+
+.shortcut-item:not(:last-child) {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.shortcut-keys {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.shortcut-keys kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 var(--spacing-sm);
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  box-shadow: inset 0 -1px 0 var(--color-border);
+}
+
+.shortcut-desc {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.shortcuts-info .help-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.shortcuts-info .help-text a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.shortcuts-info .help-text a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 480px) {
+  .shortcut-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+  }
+  
+  .shortcut-desc {
+    font-size: 12px;
+  }
+}
