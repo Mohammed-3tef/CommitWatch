@@ -1,4 +1,4 @@
-# 🔄 Commit Watch
+# Commit Watch
 
 A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories and notifies you about important commits and activity.
 
