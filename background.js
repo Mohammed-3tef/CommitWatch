@@ -379,7 +379,226 @@ async function getRepositories() {
 // =============================================================================
 
 /**
- * Classify commit priority based on message, author, and branch
+ * Analyze commit type based on structure and files changed
+ * Does NOT rely on commit message keywords
+ * 
+ * @param {Object} commit - Commit object from GitHub API
+ * @returns {Object} Commit analysis: { type, details }
+ */
+function analyzeCommitType(commit) {
+  // 1. Detect MERGE commits by parent count
+  // Merge commits have 2+ parents
+  if (commit.parents && commit.parents.length >= 2) {
+    return { type: 'merge', details: { parentCount: commit.parents.length } };
+  }
+  
+  // 2. Analyze changed files
+  if (commit.files && commit.files.length > 0) {
+    const filePatterns = {
+      docs: [
+        /\.md$/i,                    // Markdown
+        /\.mdx$/i,                   // MDX (React markdown)
+        /\.adoc$/i,                  // AsciiDoc
+        /\.rst$/i,                   // reStructuredText
+        /\.txt$/i,                   // Plain text docs
+        /^docs\//i,                  // docs/ directory
+        /^documentation\//i,         // documentation/ directory
+        /^\.github\/ISSUE_TEMPLATE/i, // Issue templates
+        /^\.github\/PULL_REQUEST_TEMPLATE/i, // PR templates
+        /^README/i,                  // README files
+        /^CHANGELOG/i,               // CHANGELOG
+        /^CONTRIBUTING/i,            // CONTRIBUTING
+        /^AUTHORS/i,                 // AUTHORS
+        /^CREDITS/i,                 // CREDITS
+        /^LICENSE/i,                 // LICENSE
+        /^COPYING/i,                 // COPYING
+        /^man\//i,                   // man pages
+        /\.1$/i,                     // man page files
+        /^wiki\//i                   // Wiki files
+      ],
+      config: [
+        /package\.json$/i,           // npm
+        /package-lock\.json$/i,      // npm lock
+        /yarn\.lock$/i,              // Yarn lock
+        /pnpm-lock\.yaml$/i,         // pnpm lock
+        /composer\.json$/i,          // PHP Composer
+        /Gemfile/i,                  // Ruby
+        /requirements\.txt$/i,       // Python
+        /Pipfile/i,                  // Python Pipenv
+        /poetry\.lock$/i,            // Python Poetry
+        /Cargo\.toml$/i,             // Rust
+        /go\.mod$/i,                 // Go
+        /\.env\.example$/i,          // Environment examples
+        /\.editorconfig$/i,          // Editor config
+        /\.gitignore$/i,             // Git ignore
+        /\.gitattributes$/i,         // Git attributes
+        /\.npmrc$/i,                 // npm config
+        /\.(eslintrc|prettierrc)/i, // Linting/formatting
+        /tsconfig\.json$/i,          // TypeScript config
+        /jsconfig\.json$/i           // JavaScript config
+      ],
+      ci: [
+        /^\.github\/workflows\//i,   // GitHub Actions
+        /^\.gitlab-ci\.yml$/i,       // GitLab CI
+        /^\.travis\.yml$/i,          // Travis CI
+        /^Jenkinsfile$/i,            // Jenkins
+        /^\.circleci\//i,            // CircleCI
+        /^azure-pipelines\.yml$/i,   // Azure Pipelines
+        /^Dockerfile$/i,             // Docker
+        /^docker-compose/i,          // Docker Compose
+        /^\.dockerignore$/i          // Docker ignore
+      ],
+      tests: [
+        /\.(test|spec)\.(js|ts|jsx|tsx|py|rb|go|rs)$/i, // Test files
+        /^tests?\//i,                // test/tests directory
+        /^__tests__\//i,             // Jest tests
+        /^spec\//i,                  // RSpec/other specs
+        /\.test$/i                   // Generic test files
+      ],
+      localization: [
+        /^locales?\//i,              // Locale directories
+        /^i18n\//i,                  // Internationalization
+        /^lang\//i,                  // Language files
+        /\.(po|pot|mo)$/i,          // gettext files
+        /^translations?\//i          // Translation directories
+      ]
+    };
+    
+    // Categorize each file
+    const categories = { docs: 0, config: 0, ci: 0, tests: 0, localization: 0, code: 0 };
+    
+    for (const file of commit.files) {
+      let categorized = false;
+      
+      for (const [category, patterns] of Object.entries(filePatterns)) {
+        if (patterns.some(pattern => pattern.test(file.filename))) {
+          categories[category]++;
+          categorized = true;
+          break;
+        }
+      }
+      
+      if (!categorized) {
+        categories.code++;
+      }
+    }
+    
+    const totalFiles = commit.files.length;
+    
+    // If ALL files are in a single non-code category, return that type
+    if (categories.docs === totalFiles) {
+      return { type: 'docs', details: { fileCount: totalFiles } };
+    }
+    if (categories.config === totalFiles) {
+      return { type: 'config', details: { fileCount: totalFiles } };
+    }
+    if (categories.ci === totalFiles) {
+      return { type: 'ci', details: { fileCount: totalFiles } };
+    }
+    if (categories.tests === totalFiles) {
+      return { type: 'tests', details: { fileCount: totalFiles } };
+    }
+    if (categories.localization === totalFiles) {
+      return { type: 'localization', details: { fileCount: totalFiles } };
+    }
+    
+    // Mixed or primarily code changes
+    return { 
+      type: 'code', 
+      details: { 
+        fileCount: totalFiles,
+        categories,
+        additions: commit.stats?.additions || 0,
+        deletions: commit.stats?.deletions || 0
+      } 
+    };
+  }
+  
+  // 3. No file info available - assume code
+  return { type: 'code', details: {} };
+}
+
+/**
+ * Detect if files are critical system components (automatic detection)
+ * 
+ * @param {Array} files - Array of file objects from commit
+ * @returns {Object} Critical file analysis
+ */
+function analyzeCriticalFiles(files) {
+  if (!files || files.length === 0) {
+    return { hasCritical: false, criticalFiles: [] };
+  }
+  
+  const criticalPatterns = [
+    // Security & Authentication
+    { pattern: /auth/i, category: 'security', weight: 3 },
+    { pattern: /security/i, category: 'security', weight: 3 },
+    { pattern: /login/i, category: 'security', weight: 3 },
+    { pattern: /password/i, category: 'security', weight: 3 },
+    { pattern: /token/i, category: 'security', weight: 3 },
+    { pattern: /session/i, category: 'security', weight: 2 },
+    { pattern: /crypto/i, category: 'security', weight: 3 },
+    { pattern: /encrypt/i, category: 'security', weight: 3 },
+    
+    // Core system files
+    { pattern: /^(src\/)?index\.(js|ts|jsx|tsx|py|rb|go|rs)$/i, category: 'core', weight: 2 },
+    { pattern: /^(src\/)?main\.(js|ts|jsx|tsx|py|rb|go|rs)$/i, category: 'core', weight: 2 },
+    { pattern: /^(src\/)?app\.(js|ts|jsx|tsx|py|rb|go|rs)$/i, category: 'core', weight: 2 },
+    { pattern: /^(src\/)?server\.(js|ts|jsx|tsx|py|rb|go|rs)$/i, category: 'core', weight: 2 },
+    { pattern: /kernel/i, category: 'core', weight: 3 },
+    { pattern: /engine/i, category: 'core', weight: 2 },
+    
+    // Database & Data
+    { pattern: /migration/i, category: 'database', weight: 2 },
+    { pattern: /schema/i, category: 'database', weight: 2 },
+    { pattern: /database/i, category: 'database', weight: 2 },
+    { pattern: /models?\//i, category: 'database', weight: 2 },
+    
+    // API endpoints
+    { pattern: /api\//i, category: 'api', weight: 1 },
+    { pattern: /routes?\//i, category: 'api', weight: 1 },
+    { pattern: /controllers?\//i, category: 'api', weight: 1 },
+    { pattern: /endpoints?\//i, category: 'api', weight: 1 },
+    
+    // Build & Dependencies (critical if changes break builds)
+    { pattern: /webpack/i, category: 'build', weight: 2 },
+    { pattern: /vite\.config/i, category: 'build', weight: 2 },
+    { pattern: /rollup/i, category: 'build', weight: 2 },
+    { pattern: /babel/i, category: 'build', weight: 1 }
+  ];
+  
+  const criticalFiles = [];
+  let maxWeight = 0;
+  
+  for (const file of files) {
+    for (const { pattern, category, weight } of criticalPatterns) {
+      if (pattern.test(file.filename)) {
+        criticalFiles.push({
+          filename: file.filename,
+          category,
+          weight,
+          changes: file.changes || 0,
+          additions: file.additions || 0,
+          deletions: file.deletions || 0
+        });
+        maxWeight = Math.max(maxWeight, weight);
+        break; // Only match first pattern per file
+      }
+    }
+  }
+  
+  return {
+    hasCritical: criticalFiles.length > 0,
+    criticalFiles,
+    maxWeight,
+    // High priority if weight >= 3 (security) or multiple critical files
+    isHighPriority: maxWeight >= 3 || criticalFiles.length >= 3
+  };
+}
+
+/**
+ * Classify commit priority based on type, message, and content
+ * Analyzes files, changes, and patterns AUTOMATICALLY
  * 
  * @param {Object} commit - Commit object from GitHub API
  * @param {Object} repo - Repository object
@@ -387,71 +606,146 @@ async function getRepositories() {
  * @returns {string} Priority level: 'high', 'medium', or 'low'
  */
 function classifyCommitPriority(commit, repo, userData) {
-  const message = commit.commit.message.toLowerCase();
-  const authorLogin = commit.author?.login || commit.commit.author?.name || '';
-  const isOwner = repo.owner.login === authorLogin;
-  const isDefaultBranch = true; // We only check default branch
+  // First, analyze commit type structurally (not by keywords)
+  const analysis = analyzeCommitType(commit);
+  const { type, details } = analysis;
   
-  // HIGH PRIORITY:
-  // - Commits to main/master (default branch)
-  // - Contains priority keywords
-  // - Commits by repository owner
-  if (isDefaultBranch) {
-    // Check for high priority keywords
-    for (const keyword of HIGH_PRIORITY_KEYWORDS) {
-      if (message.includes(keyword)) {
-        return 'high';
-      }
+  // LOW PRIORITY by type (structural detection):
+  // - Merge commits
+  // - Documentation-only changes
+  // - Configuration-only changes (package.json, etc.)
+  // - CI/CD pipeline changes
+  // - Localization/translation updates
+  if (['merge', 'docs', 'config', 'ci', 'localization'].includes(type)) {
+    return 'low';
+  }
+  
+  // Test-only changes: MEDIUM priority (important but not urgent)
+  if (type === 'tests') {
+    return 'medium';
+  }
+  
+  // For CODE commits, analyze files and content AUTOMATICALLY
+  const message = commit.commit.message.toLowerCase();
+  
+  // AUTOMATIC HIGH PRIORITY DETECTION:
+  // 1. Analyze critical files (security, auth, core system)
+  const criticalAnalysis = analyzeCriticalFiles(commit.files);
+  
+  if (criticalAnalysis.isHighPriority) {
+    // High weight security/core files changed
+    return 'high';
+  }
+  
+  // 2. Check for dangerous patterns in changes
+  if (commit.files && commit.files.length > 0) {
+    // Large deletions in code files (potential breaking changes)
+    const hasLargeDeletions = commit.files.some(file => {
+      const deletions = file.deletions || 0;
+      const additions = file.additions || 0;
+      // If deleting >100 lines with minimal additions, likely breaking
+      return deletions > 100 && additions < deletions * 0.3;
+    });
+    
+    if (hasLargeDeletions) {
+      return 'high';
     }
     
-    // Owner commits on main branch
-    if (isOwner) {
+    // Multiple critical files modified (even if lower weight)
+    if (criticalAnalysis.hasCritical && criticalAnalysis.criticalFiles.length >= 2) {
       return 'high';
     }
   }
   
+  // 3. Fallback: Check message keywords for edge cases
+  for (const keyword of HIGH_PRIORITY_KEYWORDS) {
+    if (message.includes(keyword)) {
+      return 'high';
+    }
+  }
+  
+  // AUTOMATIC MEDIUM PRIORITY DETECTION:
+  // 1. Changes to critical files with lower weight
+  if (criticalAnalysis.hasCritical) {
+    return 'medium';
+  }
+  
+  // 2. Check change size for large commits
+  if (details.additions || details.deletions) {
+    const totalChanges = details.additions + details.deletions;
+    
+    // Large commits (>500 lines) - potentially important features
+    if (totalChanges > 500) {
+      return 'medium';
+    }
+    
+    // Very large commits (>2000 lines) might be refactors - still MEDIUM
+    if (totalChanges > 2000) {
+      return 'medium';
+    }
+  }
+  
   // LOW PRIORITY:
-  // - Merge commits
-  // - Documentation changes
-  // - Formatting/style changes
-  for (const keyword of LOW_PRIORITY_KEYWORDS) {
+  // - Contains low-priority keywords (formatting, style, chore)
+  const lowKeywords = ['format', 'formatting', 'style', 'chore', 'refactor', 'rename'];
+  for (const keyword of lowKeywords) {
     if (message.includes(keyword)) {
       return 'low';
     }
   }
   
-  // Check for merge commits
-  if (message.startsWith('merge ') || message.includes('merge pull request')) {
-    return 'low';
-  }
-  
-  // MEDIUM PRIORITY: Everything else
+  // MEDIUM PRIORITY (default for code commits):
+  // - Regular feature additions
+  // - Bug fixes without critical keywords
+  // - Code improvements
   return 'medium';
 }
 
 /**
- * Fetch latest commit for a repository's default branch
+ * Fetch latest commit for a repository's default branch with full details
  * 
  * @param {Object} repo - Repository object
- * @returns {Promise<Object|null>} Latest commit or null
+ * @param {string} lastKnownSha - Last known commit SHA (for comparison)
+ * @returns {Promise<Object|null>} Latest commit with files or null
  */
-async function fetchLatestCommit(repo) {
+async function fetchLatestCommit(repo, lastKnownSha = null) {
   try {
-    const response = await fetchGitHub(
+    // First get the latest commit SHA (lightweight request)
+    const listResponse = await fetchGitHub(
       `/repos/${repo.full_name}/commits?sha=${repo.default_branch}&per_page=1`
     );
     
-    if (!response.ok) {
+    if (!listResponse.ok) {
       // Handle specific errors
-      if (response.status === 409) {
+      if (listResponse.status === 409) {
         // Empty repository
         return null;
       }
-      throw new Error(`Failed to fetch commits: ${response.status}`);
+      throw new Error(`Failed to fetch commits: ${listResponse.status}`);
     }
     
-    const commits = await response.json();
-    return commits[0] || null;
+    const commits = await listResponse.json();
+    if (!commits[0]) return null;
+    
+    const latestSha = commits[0].sha;
+    
+    // Optimization: If SHA hasn't changed, return basic info only
+    // This saves API calls when there are no new commits
+    if (lastKnownSha && latestSha === lastKnownSha) {
+      return { ...commits[0], unchanged: true };
+    }
+    
+    // Fetch full commit details including files only if SHA changed
+    const detailResponse = await fetchGitHub(
+      `/repos/${repo.full_name}/commits/${latestSha}`
+    );
+    
+    if (!detailResponse.ok) {
+      // Fall back to basic commit info if detailed fetch fails
+      return commits[0];
+    }
+    
+    return await detailResponse.json();
   } catch (error) {
     console.error(`Error fetching commits for ${repo.full_name}:`, error);
     return null;
@@ -473,13 +767,17 @@ async function checkRepoForNewCommits(repo, lastCommits, settings, userData) {
     return null;
   }
   
-  const latestCommit = await fetchLatestCommit(repo);
+  const lastKnownSha = lastCommits[repo.full_name];
+  const latestCommit = await fetchLatestCommit(repo, lastKnownSha);
   
   if (!latestCommit) {
     return null;
   }
   
-  const lastKnownSha = lastCommits[repo.full_name];
+  // Skip if commit unchanged (optimization)
+  if (latestCommit.unchanged) {
+    return null;
+  }
   
   // If this is the first check, just store the SHA
   if (!lastKnownSha) {
@@ -628,12 +926,53 @@ async function fetchLatestRelease(repo) {
 }
 
 /**
- * Check a single repository for new releases
+ * Fetch the latest tag for a repository
+ * Fallback when no formal releases exist
+ * 
+ * @param {Object} repo - Repository object
+ * @returns {Promise<Object|null>} Latest tag or null
+ */
+async function fetchLatestTag(repo) {
+  try {
+    const response = await fetchGitHub(
+      `/repos/${repo.full_name}/tags?per_page=1`
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch tags: ${response.status}`);
+    }
+    
+    const tags = await response.json();
+    if (!tags || tags.length === 0) {
+      return null;
+    }
+    
+    // Convert tag to release-like format for consistency
+    const tag = tags[0];
+    return {
+      id: tag.commit.sha, // Use commit SHA as ID
+      tag_name: tag.name,
+      name: tag.name,
+      html_url: `https://github.com/${repo.full_name}/tree/${tag.name}`, // Correct tag URL
+      prerelease: false,
+      isTag: true // Flag to differentiate from formal releases
+    };
+  } catch (error) {
+    console.error(`Error fetching tags for ${repo.full_name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Check a single repository for new releases or tags
  * 
  * @param {Object} repo - Repository to check
  * @param {Object} lastReleases - Object containing last known release IDs
  * @param {Object} settings - User settings
- * @returns {Promise<Object|null>} New release info or null
+ * @returns {Promise<Object|null>} New release/tag info or null
  */
 async function checkRepoForNewReleases(repo, lastReleases, settings) {
   // Skip if repo is disabled in settings
@@ -641,7 +980,13 @@ async function checkRepoForNewReleases(repo, lastReleases, settings) {
     return null;
   }
   
-  const latestRelease = await fetchLatestRelease(repo);
+  // Try to fetch formal release first
+  let latestRelease = await fetchLatestRelease(repo);
+  
+  // If no formal release, try to fetch latest tag
+  if (!latestRelease) {
+    latestRelease = await fetchLatestTag(repo);
+  }
   
   if (!latestRelease) {
     return null;
@@ -654,7 +999,7 @@ async function checkRepoForNewReleases(repo, lastReleases, settings) {
     return { repo, release: latestRelease, isNew: false };
   }
   
-  // Check if there's a new release
+  // Check if there's a new release/tag
   if (latestRelease.id !== lastKnownId) {
     return {
       repo,
@@ -677,11 +1022,14 @@ async function checkAllRepositoriesForReleases() {
     
     if (!settings.notificationsEnabled || !settings.releaseNotificationsEnabled) {
       console.log('[Commit Watch] Release notifications disabled, skipping check');
+      console.log('[Commit Watch] notificationsEnabled:', settings.notificationsEnabled);
+      console.log('[Commit Watch] releaseNotificationsEnabled:', settings.releaseNotificationsEnabled);
       return;
     }
     
     // Get repositories
     const repos = await getRepositories();
+    console.log(`[Commit Watch] Checking ${repos.length} repositories for releases...`);
     
     // Get last known releases
     const { lastReleases = {} } = await getStorage('lastReleases');
@@ -707,6 +1055,7 @@ async function checkAllRepositoriesForReleases() {
           
           // Track new releases for notification
           if (result.isNew) {
+            console.log(`[Commit Watch] New release detected: ${result.repo.full_name} - ${result.release.tag_name}`);
             newReleases.push(result);
           }
         }
@@ -739,30 +1088,47 @@ async function checkAllRepositoriesForReleases() {
 }
 
 /**
- * Send Chrome notification for a new release
+ * Send Chrome notification for a new release or tag
  * 
  * @param {Object} repo - Repository object
- * @param {Object} release - Release object
+ * @param {Object} release - Release/tag object
  */
 async function sendReleaseNotification(repo, release) {
   const settings = await getSettings();
   
-  if (!settings.notificationsEnabled || !settings.releaseNotificationsEnabled) return;
+  if (!settings.notificationsEnabled || !settings.releaseNotificationsEnabled) {
+    console.log('[Commit Watch] Notification skipped (disabled):', repo.full_name);
+    return;
+  }
   
   const notificationId = `release-${repo.full_name}-${release.id}`;
   const tagName = release.tag_name || 'Unknown';
   const releaseName = release.name || tagName;
   const isPrerelease = release.prerelease;
+  const isTag = release.isTag; // If true, this is a tag without formal release
   
-  await chrome.notifications.create(notificationId, {
-    type: 'basic',
-    iconUrl: 'icons/icon128.png',
-    title: `🏷️ New Release: ${repo.full_name}`,
-    message: `${releaseName}${isPrerelease ? ' (Pre-release)' : ''}`,
-    contextMessage: `Version ${tagName}`,
-    priority: 2,
-    requireInteraction: true
-  });
+  const title = isTag 
+    ? `🏷️ New Tag: ${repo.full_name}`
+    : `🏷️ New Release: ${repo.full_name}`;
+  
+  console.log(`[Commit Watch] Creating notification: ${title} - ${releaseName}`);
+  
+  try {
+    await chrome.notifications.create(notificationId, {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: title,
+      message: `${releaseName}${isPrerelease ? ' (Pre-release)' : ''}`,
+      contextMessage: isTag ? `Tag ${tagName}` : `Version ${tagName}`,
+      priority: 2,
+      requireInteraction: true
+    });
+    
+    console.log(`[Commit Watch] ✅ Notification created successfully: ${notificationId}`);
+  } catch (error) {
+    console.error(`[Commit Watch] ❌ Failed to create notification:`, error);
+    throw error;
+  }
   
   // Store notification for history
   const { notificationHistory = [] } = await getStorage('notificationHistory');

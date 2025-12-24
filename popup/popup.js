@@ -249,26 +249,62 @@ async function updateActivityList() {
     
     // Build activity list HTML
     const activityHtml = response.history.slice(0, 10).map(item => {
-      const priorityClass = `priority-${item.priority}`;
-      const priorityEmoji = {
-        high: '🔴',
-        medium: '🟡',
-        low: '🟢'
-      };
-      
-      return `
-        <a href="${item.url}" target="_blank" class="activity-item ${priorityClass}">
-          <div class="activity-header">
-            <span class="activity-repo">${truncate(item.repo, 25)}</span>
-            <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
-          </div>
-          <div class="activity-message">
-            <span class="priority-indicator">${priorityEmoji[item.priority] || ''}</span>
-            ${truncate(item.message, 50)}
-          </div>
-          <div class="activity-author">by ${item.author}</div>
-        </a>
-      `;
+      // Handle different notification types
+      if (item.type === 'release') {
+        // Release/Tag notification
+        const emoji = item.isTag ? '🏷️' : '🏷️';
+        const typeLabel = item.isTag ? 'Tag' : 'Release';
+        const prereleaseLabel = item.isPrerelease ? ' (Pre-release)' : '';
+        
+        return `
+          <a href="${item.url}" target="_blank" class="activity-item release-item">
+            <div class="activity-header">
+              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
+            </div>
+            <div class="activity-message">
+              <span class="priority-indicator">${emoji}</span>
+              ${typeLabel}: ${truncate(item.releaseName || item.tagName, 50)}${prereleaseLabel}
+            </div>
+            <div class="activity-author">Version ${item.tagName}</div>
+          </a>
+        `;
+      } else if (item.type === 'commit') {
+        // Commit notification
+        const priorityClass = `priority-${item.priority}`;
+        const priorityEmoji = {
+          high: '🔴',
+          medium: '🟡',
+          low: '🟢'
+        };
+        
+        return `
+          <a href="${item.url}" target="_blank" class="activity-item ${priorityClass}">
+            <div class="activity-header">
+              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
+            </div>
+            <div class="activity-message">
+              <span class="priority-indicator">${priorityEmoji[item.priority] || ''}</span>
+              ${truncate(item.message, 50)}
+            </div>
+            <div class="activity-author">by ${item.author}</div>
+          </a>
+        `;
+      } else {
+        // Generic notification (GitHub notifications, etc.)
+        return `
+          <a href="${item.url}" target="_blank" class="activity-item">
+            <div class="activity-header">
+              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
+            </div>
+            <div class="activity-message">
+              ${truncate(item.message || item.title || 'Notification', 50)}
+            </div>
+          </a>
+        `;
+      }
     }).join('');
     
     elements.activityList.innerHTML = activityHtml;
