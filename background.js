@@ -1119,7 +1119,7 @@ async function sendReleaseNotification(repo, release) {
   }
   detailedMessage += `\nVersion: ${tagName}`;
   if (authorName !== 'Unknown') {
-    detailedMessage += `\nPublished by: ${authorName}`;
+    detailedMessage += ` by ${authorName}`;
   }
   
   console.log(`[Commit Watch] Creating notification: ${repo.name} - ${releaseName}`);
@@ -1128,9 +1128,9 @@ async function sendReleaseNotification(repo, release) {
     await chrome.notifications.create(notificationId, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: `${typeInfo.emoji} ${repo.full_name} · NEW ${typeInfo.label}`,
+      title: `${typeInfo.emoji} ${repo.full_name}`,
       message: detailedMessage,
-      contextMessage: `${timeStr} · ${isPrerelease ? '⚠️ Pre-release' : '✅ Stable'}`,
+      contextMessage: `${timeStr} · ${isPrerelease ? 'Pre-release' : 'Stable'}`,
       priority: 2,
       requireInteraction: true,
       buttons: [
@@ -1296,19 +1296,16 @@ async function sendCommitNotification(repo, commit, priority) {
   const notificationId = `commit-${repo.full_name}-${shortSha}`;
   const timeStr = formatTime();
   
-  // Build detailed message
-  let detailedMessage = `👤 ${authorName}\n📝 ${title}`;
-  if (description) {
-    detailedMessage += `\n   ${description}...`;
-  }
+  // Build clean message
+  let detailedMessage = `${authorName}: ${title}`;
   if (statsText) {
-    detailedMessage += `\n📊 ${statsText}`;
+    detailedMessage += `\n${statsText}`;
   }
   
   await chrome.notifications.create(notificationId, {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
-    title: `${config.emoji} ${typeInfo.emoji} ${repo.full_name}`,
+    title: `${typeInfo.emoji} ${repo.full_name}`,
     message: detailedMessage,
     contextMessage: `${timeStr} · ${typeInfo.label} · ${shortSha}`,
     priority: priority === 'high' ? 2 : (priority === 'medium' ? 1 : 0),
@@ -1345,41 +1342,18 @@ async function sendGitHubNotification(notification) {
   const notificationId = `github-${notification.id}`;
   const typeInfo = getNotificationTypeInfo(notification.subject.type);
   const timeStr = formatTime();
-  
-  // Format reason with emoji
-  const reasonEmojis = {
-    review_requested: '👀',
-    mention: '💬',
-    author: '✍️',
-    comment: '💭',
-    ci_activity: '⚙️',
-    security_alert: '🔒',
-    assign: '📌',
-    team_mention: '👥',
-    subscribed: '🔔',
-    state_change: '🔄'
-  };
-  const reasonEmoji = reasonEmojis[notification.reason] || '📬';
   const reasonText = notification.reason.replace(/_/g, ' ');
   
-  // Build detailed message
-  let detailedMessage = `📋 ${notification.subject.title}`;
-  detailedMessage += `\n${reasonEmoji} Reason: ${reasonText}`;
-  detailedMessage += `\n📁 ${notification.repository.full_name}`;
-  
-  // Add update time if available
-  if (notification.updated_at) {
-    const updatedDate = new Date(notification.updated_at);
-    const dateStr = updatedDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
-    detailedMessage += `\n📅 Updated: ${dateStr}`;
-  }
+  // Build clean message
+  let detailedMessage = `${notification.subject.title}`;
+  detailedMessage += `\n${reasonText}`;
   
   await chrome.notifications.create(notificationId, {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
-    title: `${typeInfo.emoji} GitHub ${typeInfo.label}`,
+    title: `${typeInfo.emoji} ${notification.repository.full_name}`,
     message: detailedMessage,
-    contextMessage: `${timeStr} · ${notification.repository.name}`,
+    contextMessage: `${timeStr} · ${typeInfo.label}`,
     priority: notification.reason === 'security_alert' ? 2 : 1,
     requireInteraction: notification.reason === 'review_requested' || notification.reason === 'security_alert',
     buttons: [
