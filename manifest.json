@@ -47,22 +47,22 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Alt+Shift+C",
-        "mac": "Alt+Shift+C"
+        "default": "Ctrl+Shift+C",
+        "mac": "Command+Shift+C"
       },
       "description": "Open Commit Watch popup"
     },
     "check-now": {
       "suggested_key": {
-        "default": "Alt+Shift+R",
-        "mac": "Alt+Shift+R"
+        "default": "Ctrl+Shift+R",
+        "mac": "Command+Shift+R"
       },
       "description": "Check for new commits now"
     },
     "mark-all-read": {
       "suggested_key": {
-        "default": "Alt+Shift+M",
-        "mac": "Alt+Shift+M"
+        "default": "Ctrl+Shift+M",
+        "mac": "Command+Shift+M"
       },
       "description": "Mark all notifications as read"
     }

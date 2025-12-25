@@ -99,7 +99,7 @@ async function getSettings() {
     ignoreOwnCommits: false,
     enabledRepos: {}, // { 'owner/repo': true/false }
     notificationsEnabled: true,
-    releaseNotificationsEnabled: true, // Monitor new releases/tags
+    releaseNotificationsEnabled: true, // Monitor new releases
     ...settings
   };
 }
@@ -953,12 +953,12 @@ async function fetchLatestTag(repo) {
     // Convert tag to release-like format for consistency
     const tag = tags[0];
     return {
-      id: tag.commit.sha, // Use commit SHA as ID
+      id: tag.commit.sha,
       tag_name: tag.name,
       name: tag.name,
-      html_url: `https://github.com/${repo.full_name}/tree/${tag.name}`, // Correct tag URL
+      html_url: `https://github.com/${repo.full_name}/releases/tag/${tag.name}`,
       prerelease: false,
-      isTag: true // Flag to differentiate from formal releases
+      isTag: true
     };
   } catch (error) {
     console.error(`Error fetching tags for ${repo.full_name}:`, error);
@@ -994,13 +994,14 @@ async function checkRepoForNewReleases(repo, lastReleases, settings) {
   
   const lastKnownId = lastReleases[repo.full_name];
   
-  // If this is the first check, just store the ID
+  // If this is the first check, just store the ID (don't notify to avoid spam)
   if (!lastKnownId) {
     return { repo, release: latestRelease, isNew: false };
   }
   
   // Check if there's a new release/tag
-  if (latestRelease.id !== lastKnownId) {
+  if (String(latestRelease.id) !== String(lastKnownId)) {
+    console.log(`[Commit Watch] ${repo.full_name}: NEW RELEASE DETECTED! ${lastKnownId} -> ${latestRelease.id}`);
     return {
       repo,
       release: latestRelease,
@@ -1088,7 +1089,7 @@ async function checkAllRepositoriesForReleases() {
 }
 
 /**
- * Send Chrome notification for a new release or tag
+ * Send Chrome notification for a new release or tag (detailed)
  * 
  * @param {Object} repo - Repository object
  * @param {Object} release - Release/tag object
@@ -1105,23 +1106,37 @@ async function sendReleaseNotification(repo, release) {
   const tagName = release.tag_name || 'Unknown';
   const releaseName = release.name || tagName;
   const isPrerelease = release.prerelease;
-  const isTag = release.isTag; // If true, this is a tag without formal release
+  const isTag = release.isTag;
+  const authorName = release.author?.login || 'Unknown';
   
-  const title = isTag 
-    ? `🏷️ New Tag: ${repo.full_name}`
-    : `🏷️ New Release: ${repo.full_name}`;
+  const typeInfo = getNotificationTypeInfo(isTag ? 'tag' : 'release');
+  const timeStr = formatTime();
   
-  console.log(`[Commit Watch] Creating notification: ${title} - ${releaseName}`);
+  // Build detailed message
+  let detailedMessage = `${releaseName}`;
+  if (isPrerelease) {
+    detailedMessage += ' (Pre-release)';
+  }
+  detailedMessage += `\nVersion: ${tagName}`;
+  if (authorName !== 'Unknown') {
+    detailedMessage += `\nPublished by: ${authorName}`;
+  }
+  
+  console.log(`[Commit Watch] Creating notification: ${repo.name} - ${releaseName}`);
   
   try {
     await chrome.notifications.create(notificationId, {
       type: 'basic',
       iconUrl: 'icons/icon128.png',
-      title: title,
-      message: `${releaseName}${isPrerelease ? ' (Pre-release)' : ''}`,
-      contextMessage: isTag ? `Tag ${tagName}` : `Version ${tagName}`,
+      title: `${typeInfo.emoji} ${repo.full_name} · NEW ${typeInfo.label}`,
+      message: detailedMessage,
+      contextMessage: `${timeStr} · ${isPrerelease ? '⚠️ Pre-release' : '✅ Stable'}`,
       priority: 2,
-      requireInteraction: true
+      requireInteraction: true,
+      buttons: [
+        { title: `View ${isTag ? 'Tag' : 'Release'}` },
+        { title: 'Dismiss' }
+      ]
     });
     
     console.log(`[Commit Watch] ✅ Notification created successfully: ${notificationId}`);
@@ -1130,22 +1145,15 @@ async function sendReleaseNotification(repo, release) {
     throw error;
   }
   
-  // Store notification for history
-  const { notificationHistory = [] } = await getStorage('notificationHistory');
-  notificationHistory.unshift({
+  await storeNotificationHistory({
     id: notificationId,
-    type: 'release',
+    type: isTag ? 'tag' : 'release',
     repo: repo.full_name,
     tagName,
     releaseName,
     isPrerelease,
-    url: release.html_url,
-    timestamp: Date.now()
-  });
-  
-  // Keep last 100 notifications
-  await setStorage({ 
-    notificationHistory: notificationHistory.slice(0, 100) 
+    author: authorName,
+    url: release.html_url
   });
 }
 
@@ -1202,7 +1210,52 @@ async function checkGitHubNotifications() {
 // =============================================================================
 
 /**
- * Send Chrome notification for a new commit
+ * Get notification type info with emoji and label
+ * @param {string} type - Notification type
+ * @returns {Object} { emoji, label }
+ */
+function getNotificationTypeInfo(type) {
+  const types = {
+    // Commit types
+    merge: { emoji: '🔀', label: 'MERGE' },
+    docs: { emoji: '📝', label: 'DOCS' },
+    config: { emoji: '⚙️', label: 'CONFIG' },
+    ci: { emoji: '🔧', label: 'CI/CD' },
+    tests: { emoji: '🧪', label: 'TESTS' },
+    localization: { emoji: '🌍', label: 'I18N' },
+    code: { emoji: '💻', label: 'COMMIT' },
+    // Release types
+    release: { emoji: '🚀', label: 'RELEASE' },
+    tag: { emoji: '🏷️', label: 'TAG' },
+    // GitHub notification types
+    PullRequest: { emoji: '🔀', label: 'PR' },
+    Issue: { emoji: '🐛', label: 'ISSUE' },
+    CheckSuite: { emoji: '⚙️', label: 'CI/CD' },
+    default: { emoji: '📬', label: 'NOTIFICATION' }
+  };
+  return types[type] || types.default;
+}
+
+/**
+ * Format time like WhatsApp
+ * @returns {string} Formatted time string
+ */
+function formatTime() {
+  return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+/**
+ * Store notification in history
+ * @param {Object} notification - Notification data to store
+ */
+async function storeNotificationHistory(notification) {
+  const { notificationHistory = [] } = await getStorage('notificationHistory');
+  notificationHistory.unshift({ ...notification, timestamp: Date.now() });
+  await setStorage({ notificationHistory: notificationHistory.slice(0, 100) });
+}
+
+/**
+ * Send Chrome notification for a new commit (detailed)
  * 
  * @param {Object} repo - Repository object
  * @param {Object} commit - Commit object
@@ -1213,79 +1266,143 @@ async function sendCommitNotification(repo, commit, priority) {
   
   if (!settings.notificationsEnabled) return;
   
+  // Analyze commit type
+  const analysis = analyzeCommitType(commit);
+  const commitType = analysis.type;
+  const typeInfo = getNotificationTypeInfo(commitType);
+  
   // Build notification message
   const authorName = commit.commit.author?.name || commit.author?.login || 'Unknown';
-  const message = commit.commit.message.split('\n')[0]; // First line only
+  const fullMessage = commit.commit.message;
+  const messageLines = fullMessage.split('\n').filter(l => l.trim());
+  const title = messageLines[0] || 'No message';
+  const description = messageLines.slice(1).join(' ').substring(0, 100);
+  const shortSha = commit.sha.substring(0, 7);
   
-  // Priority emoji
-  const priorityEmoji = {
-    high: '🔴',
-    medium: '🟡',
-    low: '🟢'
+  // Get file stats
+  const filesChanged = commit.files?.length || 0;
+  const additions = commit.stats?.additions || 0;
+  const deletions = commit.stats?.deletions || 0;
+  const statsText = filesChanged > 0 ? `${filesChanged} files · +${additions} -${deletions}` : '';
+  
+  // Priority config
+  const priorityConfig = {
+    high: { emoji: '🔴', label: 'URGENT', color: 'red' },
+    medium: { emoji: '🟡', label: 'UPDATE', color: 'yellow' },
+    low: { emoji: '🟢', label: 'INFO', color: 'green' }
   };
+  const config = priorityConfig[priority];
   
-  const notificationId = `commit-${repo.full_name}-${commit.sha.substring(0, 7)}`;
+  const notificationId = `commit-${repo.full_name}-${shortSha}`;
+  const timeStr = formatTime();
+  
+  // Build detailed message
+  let detailedMessage = `👤 ${authorName}\n📝 ${title}`;
+  if (description) {
+    detailedMessage += `\n   ${description}...`;
+  }
+  if (statsText) {
+    detailedMessage += `\n📊 ${statsText}`;
+  }
   
   await chrome.notifications.create(notificationId, {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
-    title: `${priorityEmoji[priority]} ${repo.full_name}`,
-    message: `${authorName}: ${message}`,
-    contextMessage: `${priority.toUpperCase()} priority commit`,
+    title: `${config.emoji} ${typeInfo.emoji} ${repo.full_name}`,
+    message: detailedMessage,
+    contextMessage: `${timeStr} · ${typeInfo.label} · ${shortSha}`,
     priority: priority === 'high' ? 2 : (priority === 'medium' ? 1 : 0),
-    requireInteraction: priority === 'high'
+    requireInteraction: priority === 'high',
+    silent: priority === 'low',
+    buttons: [
+      { title: 'View Commit' },
+      { title: 'Mark as Read' }
+    ]
   });
   
-  // Store notification for history
-  const { notificationHistory = [] } = await getStorage('notificationHistory');
-  notificationHistory.unshift({
+  await storeNotificationHistory({
     id: notificationId,
     type: 'commit',
+    commitType,
     repo: repo.full_name,
     author: authorName,
-    message,
+    message: title,
     priority,
     sha: commit.sha,
     url: commit.html_url,
-    timestamp: Date.now()
-  });
-  
-  // Keep last 100 notifications
-  await setStorage({ 
-    notificationHistory: notificationHistory.slice(0, 100) 
+    filesChanged,
+    additions,
+    deletions
   });
 }
 
 /**
- * Send Chrome notification for GitHub notification
+ * Send Chrome notification for GitHub notification (detailed)
  * 
  * @param {Object} notification - GitHub notification object
  */
 async function sendGitHubNotification(notification) {
   const notificationId = `github-${notification.id}`;
+  const typeInfo = getNotificationTypeInfo(notification.subject.type);
+  const timeStr = formatTime();
   
-  // Type-specific icons/text
-  const typeInfo = {
-    PullRequest: { emoji: '🔀', label: 'Pull Request' },
-    Issue: { emoji: '🐛', label: 'Issue' },
-    CheckSuite: { emoji: '⚙️', label: 'CI/CD' },
-    default: { emoji: '📬', label: 'Notification' }
+  // Format reason with emoji
+  const reasonEmojis = {
+    review_requested: '👀',
+    mention: '💬',
+    author: '✍️',
+    comment: '💭',
+    ci_activity: '⚙️',
+    security_alert: '🔒',
+    assign: '📌',
+    team_mention: '👥',
+    subscribed: '🔔',
+    state_change: '🔄'
   };
+  const reasonEmoji = reasonEmojis[notification.reason] || '📬';
+  const reasonText = notification.reason.replace(/_/g, ' ');
   
-  const info = typeInfo[notification.subject.type] || typeInfo.default;
+  // Build detailed message
+  let detailedMessage = `📋 ${notification.subject.title}`;
+  detailedMessage += `\n${reasonEmoji} Reason: ${reasonText}`;
+  detailedMessage += `\n📁 ${notification.repository.full_name}`;
+  
+  // Add update time if available
+  if (notification.updated_at) {
+    const updatedDate = new Date(notification.updated_at);
+    const dateStr = updatedDate.toLocaleDateString([], { month: 'short', day: 'numeric' });
+    detailedMessage += `\n📅 Updated: ${dateStr}`;
+  }
   
   await chrome.notifications.create(notificationId, {
     type: 'basic',
     iconUrl: 'icons/icon128.png',
-    title: `${info.emoji} ${info.label}: ${notification.repository.full_name}`,
-    message: notification.subject.title,
-    contextMessage: `Reason: ${notification.reason.replace('_', ' ')}`,
-    priority: 1
+    title: `${typeInfo.emoji} GitHub ${typeInfo.label}`,
+    message: detailedMessage,
+    contextMessage: `${timeStr} · ${notification.repository.name}`,
+    priority: notification.reason === 'security_alert' ? 2 : 1,
+    requireInteraction: notification.reason === 'review_requested' || notification.reason === 'security_alert',
+    buttons: [
+      { title: 'View on GitHub' },
+      { title: 'Mark as Read' }
+    ]
+  });
+  
+  await storeNotificationHistory({
+    id: notificationId,
+    type: 'github',
+    subType: notification.subject.type,
+    reason: notification.reason,
+    repo: notification.repository.full_name,
+    title: notification.subject.title,
+    url: notification.subject.url 
+      ? notification.subject.url.replace('api.github.com/repos', 'github.com') 
+      : `https://github.com/${notification.repository.full_name}`
   });
 }
 
 // =============================================================================
-// NOTIFICATION CLICK HANDLER
+// NOTIFICATION CLICK & BUTTON HANDLERS
 // =============================================================================
 
 /**
@@ -1304,6 +1421,26 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
   }
   
   // Clear the notification
+  chrome.notifications.clear(notificationId);
+});
+
+/**
+ * Handle notification button clicks (WhatsApp-style actions)
+ */
+chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIndex) => {
+  const { notificationHistory = [] } = await getStorage('notificationHistory');
+  const notification = notificationHistory.find(n => n.id === notificationId);
+  
+  if (buttonIndex === 0) {
+    // First button: View/Open
+    if (notification && notification.url) {
+      chrome.tabs.create({ url: notification.url });
+    } else if (notificationId.startsWith('github-')) {
+      chrome.tabs.create({ url: 'https://github.com/notifications' });
+    }
+  }
+  
+  // Both buttons dismiss the notification
   chrome.notifications.clear(notificationId);
 });
 
@@ -1422,6 +1559,7 @@ async function handleMessage(message) {
         
       case 'checkNow':
         await checkAllRepositoriesForCommits();
+        await checkAllRepositoriesForReleases();
         await checkGitHubNotifications();
         return { success: true };
         
@@ -1448,6 +1586,12 @@ async function handleMessage(message) {
         
       case 'clearBadge':
         await clearUnreadCount();
+        return { success: true };
+      
+      case 'resetReleaseCache':
+        // Clear stored release IDs to force re-detection
+        await setStorage({ lastReleases: {} });
+        console.log('[Commit Watch] Release cache cleared');
         return { success: true };
         
       default:
