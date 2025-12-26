@@ -61,6 +61,8 @@ const elements = {
 
 // Store repositories for filtering
 let allRepositories = [];
+let currentPlatformFilter = 'all';
+let currentSearchQuery = '';
 
 // =============================================================================
 // UTILITY FUNCTIONS
@@ -475,20 +477,72 @@ async function loadRepositories() {
 }
 
 /**
+ * Filter repositories by platform and search query
+ * @param {Array} repos - All repositories
+ * @returns {Array} Filtered repositories
+ */
+function filterRepositories(repos) {
+  let filtered = repos;
+  
+  // Filter by platform
+  if (currentPlatformFilter !== 'all') {
+    filtered = filtered.filter(repo => {
+      const platform = repo.platform || 'github';
+      return platform === currentPlatformFilter;
+    });
+  }
+  
+  // Filter by search query
+  if (currentSearchQuery) {
+    const query = currentSearchQuery.toLowerCase().trim();
+    filtered = filtered.filter(repo => 
+      repo.full_name.toLowerCase().includes(query) ||
+      (repo.language && repo.language.toLowerCase().includes(query))
+    );
+  }
+  
+  return filtered;
+}
+
+/**
  * Render repository list
- * @param {Array} repos - Repositories to render
+ * @param {Array} repos - Repositories to render (will be filtered)
  */
 async function renderRepositories(repos) {
-  if (repos.length === 0) {
-    elements.repoList.innerHTML = `
-      <p class="empty-state">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-        </svg>
-        No repositories found
-      </p>
-    `;
+  // Apply filters
+  const filteredRepos = filterRepositories(repos);
+  
+  // Update count to show filtered count
+  const totalCount = repos.length;
+  const filteredCount = filteredRepos.length;
+  if (filteredCount < totalCount) {
+    elements.repoCount.textContent = `${filteredCount} / ${totalCount}`;
+  } else {
+    elements.repoCount.textContent = totalCount;
+  }
+  
+  if (filteredRepos.length === 0) {
+    if (repos.length === 0) {
+      elements.repoList.innerHTML = `
+        <p class="empty-state">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          No repositories found
+        </p>
+      `;
+    } else {
+      elements.repoList.innerHTML = `
+        <p class="empty-state">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          No repositories match the current filter
+        </p>
+      `;
+    }
     return;
   }
   
@@ -496,7 +550,7 @@ async function renderRepositories(repos) {
   const response = await sendMessage({ action: 'getSettings' });
   const enabledRepos = response.settings?.enabledRepos || {};
   
-  const repoHtml = repos.map(repo => {
+  const repoHtml = filteredRepos.map(repo => {
     // Use platform-specific key for enabled status
     const platform = repo.platform || 'github';
     const repoKey = `${platform}:${repo.full_name}`;
@@ -555,6 +609,27 @@ async function renderRepositories(repos) {
   document.querySelectorAll('.repo-toggle').forEach(toggle => {
     toggle.addEventListener('change', handleRepoToggle);
   });
+}
+
+/**
+ * Handle platform filter button click
+ * @param {string} platform - 'all', 'github', or 'gitlab'
+ */
+function handlePlatformFilter(platform) {
+  currentPlatformFilter = platform;
+  
+  // Update button states
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  filterButtons.forEach(btn => {
+    if (btn.dataset.platform === platform) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  // Re-render repositories with filter applied
+  renderRepositories(allRepositories);
 }
 
 /**
@@ -622,19 +697,8 @@ async function handleRefreshRepos() {
  * Handle repository search
  */
 const handleRepoSearch = debounce((event) => {
-  const query = event.target.value.toLowerCase().trim();
-  
-  if (!query) {
-    renderRepositories(allRepositories);
-    return;
-  }
-  
-  const filtered = allRepositories.filter(repo => 
-    repo.full_name.toLowerCase().includes(query) ||
-    (repo.language && repo.language.toLowerCase().includes(query))
-  );
-  
-  renderRepositories(filtered);
+  currentSearchQuery = event.target.value;
+  renderRepositories(allRepositories);
 }, 300);
 
 /**
@@ -735,6 +799,12 @@ function initEventListeners() {
   elements.repoSearch.addEventListener('input', handleRepoSearch);
   elements.enableAllBtn.addEventListener('click', handleEnableAll);
   elements.disableAllBtn.addEventListener('click', handleDisableAll);
+  
+  // Platform filter buttons
+  const filterButtons = document.querySelectorAll('.filter-btn');
+  filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => handlePlatformFilter(btn.dataset.platform));
+  });
   
   // Theme
   elements.themeToggleBtn.addEventListener('click', toggleTheme);

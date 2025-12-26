@@ -48,10 +48,14 @@ const elements = {
   logoutBtn: document.getElementById('logout-btn'),
   repoCount: document.getElementById('repo-count'),
   commitCount: document.getElementById('commit-count'),
-  rateLimit: document.getElementById('rate-limit'),
+  githubRateLimit: document.getElementById('github-rate-limit'),
+  gitlabRateLimit: document.getElementById('gitlab-rate-limit'),
+  githubRateLimitCard: document.getElementById('github-rate-limit-card'),
+  gitlabRateLimitCard: document.getElementById('gitlab-rate-limit-card'),
   checkNowBtn: document.getElementById('check-now-btn'),
   lastCheckTime: document.getElementById('last-check-time'),
-  activityList: document.getElementById('activity-list')
+  activityList: document.getElementById('activity-list'),
+  filterButtons: document.querySelectorAll('.filter-btn')
 };
 
 // =============================================================================
@@ -243,9 +247,20 @@ async function updateMainView() {
       elements.repoCount.textContent = repoResponse.repositories.length;
     }
     
-    // Update rate limit
-    if (status.rateLimit) {
-      elements.rateLimit.textContent = status.rateLimit.remaining;
+    // Update GitHub rate limit
+    if (status.rateLimit && status.githubAuthenticated) {
+      elements.githubRateLimit.textContent = status.rateLimit.remaining || '-';
+      elements.githubRateLimitCard.classList.remove('hidden');
+    } else {
+      elements.githubRateLimitCard.classList.add('hidden');
+    }
+    
+    // Update GitLab rate limit
+    if (status.gitlabRateLimit && status.gitlabAuthenticated) {
+      elements.gitlabRateLimit.textContent = status.gitlabRateLimit.remaining || '-';
+      elements.gitlabRateLimitCard.classList.remove('hidden');
+    } else {
+      elements.gitlabRateLimitCard.classList.add('hidden');
     }
     
     // Update last check time
@@ -264,26 +279,69 @@ async function updateMainView() {
   }
 }
 
+// Store current filter and activity data
+let currentPlatformFilter = 'all';
+let activityData = [];
+
 /**
- * Update the activity list with recent notifications
+ * Get the current platform filter from storage
  */
-async function updateActivityList() {
-  try {
-    const response = await sendMessage({ action: 'getNotificationHistory' });
-    
-    if (!response.success || !response.history || response.history.length === 0) {
-      elements.activityList.innerHTML = '<p class="empty-state">No recent commits</p>';
-      elements.commitCount.textContent = '0';
-      return;
+async function getPlatformFilter() {
+  const { platformFilter } = await chrome.storage.local.get('platformFilter');
+  return platformFilter || 'all';
+}
+
+/**
+ * Set the platform filter and save to storage
+ */
+async function setPlatformFilter(platform) {
+  currentPlatformFilter = platform;
+  await chrome.storage.local.set({ platformFilter: platform });
+  renderActivityList();
+}
+
+/**
+ * Filter activity items by platform
+ */
+function filterActivityByPlatform(items, platform) {
+  if (platform === 'all') {
+    return items;
+  }
+  return items.filter(item => {
+    // Determine platform from item
+    let itemPlatform = item.platform;
+    if (!itemPlatform && item.url) {
+      // Fallback: detect platform from URL
+      if (item.url.includes('gitlab.com')) {
+        itemPlatform = 'gitlab';
+      } else {
+        itemPlatform = 'github';
+      }
     }
-    
-    // Count today's commits
-    const today = new Date().setHours(0, 0, 0, 0);
-    const todayCommits = response.history.filter(n => n.timestamp >= today).length;
-    elements.commitCount.textContent = todayCommits;
-    
-    // Build activity list HTML
-    const activityHtml = response.history.slice(0, 10).map(item => {
+    return itemPlatform === platform;
+  });
+}
+
+/**
+ * Render the activity list with current filter applied
+ */
+function renderActivityList() {
+  const filteredItems = filterActivityByPlatform(activityData, currentPlatformFilter);
+  
+  if (filteredItems.length === 0) {
+    if (activityData.length === 0) {
+      elements.activityList.innerHTML = '<p class="empty-state">No recent commits</p>';
+    } else {
+      elements.activityList.innerHTML = `<p class="empty-state">No ${currentPlatformFilter === 'all' ? '' : currentPlatformFilter} activity</p>`;
+    }
+    return;
+  }
+  
+  // Limit to 10 items for display
+  const displayItems = filteredItems.slice(0, 10);
+  
+  // Build activity list HTML
+  const activityHtml = displayItems.map(item => {
       // Platform badge - determine from stored platform or infer from URL
       let platform = item.platform;
       if (!platform) {
@@ -360,10 +418,53 @@ async function updateActivityList() {
     }).join('');
     
     elements.activityList.innerHTML = activityHtml;
+}
+
+/**
+ * Update the activity list with recent notifications
+ */
+async function updateActivityList() {
+  try {
+    const response = await sendMessage({ action: 'getNotificationHistory' });
+    
+    if (!response.success || !response.history || response.history.length === 0) {
+      activityData = [];
+      elements.activityList.innerHTML = '<p class="empty-state">No recent commits</p>';
+      elements.commitCount.textContent = '0';
+      return;
+    }
+    
+    // Store all activity data
+    activityData = response.history.slice(0, 50); // Store more items for filtering
+    
+    // Count today's commits (all platforms)
+    const today = new Date().setHours(0, 0, 0, 0);
+    const todayCommits = activityData.filter(n => n.timestamp >= today).length;
+    elements.commitCount.textContent = todayCommits;
+    
+    // Render with current filter
+    renderActivityList();
     
   } catch (error) {
     console.error('Error updating activity list:', error);
   }
+}
+
+/**
+ * Handle platform filter button click
+ */
+async function handlePlatformFilter(platform) {
+  // Update button states
+  elements.filterButtons.forEach(btn => {
+    if (btn.dataset.platform === platform) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  
+  // Update filter
+  await setPlatformFilter(platform);
 }
 
 // =============================================================================
@@ -603,6 +704,21 @@ async function init() {
   elements.checkNowBtn.addEventListener('click', handleCheckNow);
   elements.settingsBtn.addEventListener('click', handleOpenSettings);
   elements.themeToggleBtn.addEventListener('click', toggleTheme);
+  
+  // Set up platform filter buttons
+  elements.filterButtons.forEach(btn => {
+    btn.addEventListener('click', () => handlePlatformFilter(btn.dataset.platform));
+  });
+  
+  // Load saved platform filter
+  currentPlatformFilter = await getPlatformFilter();
+  elements.filterButtons.forEach(btn => {
+    if (btn.dataset.platform === currentPlatformFilter) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
   
   // Keyboard shortcuts for popup
   document.addEventListener('keydown', handleKeyboardShortcuts);

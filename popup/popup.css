@@ -121,8 +121,8 @@ body {
    ============================================================================= */
 
 .footer {
-  margin-top: var(--spacing-lg);
-  padding-top: var(--spacing-md);
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-sm);
   border-top: 1px solid var(--color-border);
   text-align: center;
 }
@@ -478,9 +478,15 @@ footer a:hover {
 /* Stats Grid */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-lg);
+}
+
+@media (min-width: 400px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }
 
 .stat-card {
@@ -504,19 +510,31 @@ footer a:hover {
   color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.actions-container{
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 /* Actions */
 .actions {
-  margin-bottom: var(--spacing-md);
+  margin-bottom: var(--spacing-sm);
+  width: 100%;
 }
 
 /* Last Check */
 .last-check {
-  text-align: center;
+  width: 100%;
   font-size: 12px;
   color: var(--color-text-muted);
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
 /* =============================================================================
@@ -529,11 +547,56 @@ footer a:hover {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--color-text-muted);
+}
+
+.activity-header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: var(--spacing-sm);
 }
 
+.platform-filter {
+  display: flex;
+  gap: var(--spacing-xs);
+  align-items: center;
+}
+
+.filter-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.filter-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.filter-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+.filter-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 .activity-list {
-  max-height: 200px;
+  max-height: 175px;
   overflow-y: auto;
 }
 
