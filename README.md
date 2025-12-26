@@ -1,22 +1,23 @@
 # Commit Watch
 
-**Version 2.0.0** - Enhanced with Intelligent Commit Analysis & Release Monitoring
+**Version 2.0.0** - Now with GitLab Support, Enhanced Intelligent Commit Analysis & Release Monitoring
 
-A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories and notifies you about important commits, releases, and activity with **automatic file-based detection**.
+A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab** repositories and notifies you about important commits, releases, and activity with **automatic file-based detection**.
 
 [![Chrome Extension](https://img.shields.io/badge/Chrome-Extension-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
 [![Manifest V3](https://img.shields.io/badge/Manifest-V3-green)](https://developer.chrome.com/docs/extensions/mv3/)
 [![GitHub API](https://img.shields.io/badge/GitHub-API-181717?logo=github)](https://docs.github.com/en/rest)
+[![GitLab API](https://img.shields.io/badge/GitLab-API-FCA121?logo=gitlab)](https://docs.gitlab.com/ee/api/)
 [![License](https://img.shields.io/badge/License-MPL-blue)](./LICENSE)
 
-> **🎯 Never miss important commits!** Get intelligent notifications for critical code changes, security updates, and releases without the noise.
+> **🎯 Never miss important commits!** Get intelligent notifications for critical code changes, security updates, and releases from **GitHub and GitLab** without the noise.
 
 ### 🚀 Quick Start
 
 1. **Load Extension**: `chrome://extensions` → Enable Developer Mode → Load unpacked
-2. **Get Token**: [Generate GitHub PAT](https://github.com/settings/tokens/new?scopes=repo,read:user,notifications&description=Commit%20Watch) (repo, read:user, notifications)
-3. **Configure**: Click extension icon → Paste token → Save
-4. **Done!** Notifications will start appearing automatically
+2. **Get Token**: [Generate GitHub PAT](https://github.com/settings/tokens/new?scopes=repo,read:user,notifications&description=Commit%20Watch) (repo, read:user, notifications) and/or [Generate GitLab PAT](https://gitlab.com/-/profile/personal_access_tokens) (api, read_user, read_repository)
+3. **Configure**: Click extension icon → Paste your GitHub and/or GitLab token(s) → Save
+4. **Done!** Notifications will start appearing automatically for both platforms
 
 ---
 
@@ -34,11 +35,11 @@ A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories
 ## ✨ Features
 
 ### 🔔 Smart Notifications
-- **Real-time commit monitoring** for all repositories you're involved in (owner, collaborator, organization member)
+- **Real-time commit monitoring** for all repositories you're involved in (owner, collaborator, organization member) on **GitHub and GitLab**
 - **Intelligent priority classification** - analyzes files, changes, and patterns automatically
-- **Release & Tag notifications** - monitors GitHub Releases and Git tags
-- **GitHub native notifications** - PR reviews, mentions, CI failures, security alerts
-- **Recent Activity feed** - unified view of all commits, releases, and notifications
+- **Release & Tag notifications** - monitors GitHub Releases, GitLab Releases, and Git tags
+- **Native notifications** - PR/MR reviews, mentions, CI failures, security alerts (GitHub & GitLab)
+- **Recent Activity feed** - unified view of all commits, releases, and notifications, filterable by platform
 
 ### 🎯 Intelligent Priority Classification
 
@@ -51,10 +52,10 @@ A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories
 | 🟢 **Low** | • Merge commits (2+ parent commits)<br>• Documentation-only (`.md`, `docs/`, `README`, `CHANGELOG`)<br>• Config files (`package.json`, `.eslintrc`, `tsconfig.json`)<br>• CI/CD changes (`.github/workflows/`, `Dockerfile`)<br>• Localization updates (`locales/`, `i18n/`)<br>• Style/formatting keywords: `format`, `style`, `chore`, `refactor` |
 
 ### 🏷️ Release & Tag Monitoring
-- **Formal Releases** - GitHub Release notifications with version info
-- **Git Tags** - Detects tags even without formal releases
+- **Formal Releases** - GitHub and GitLab Release notifications with version info
+- **Git Tags** - Detects tags even without formal releases (both platforms)
 - **Pre-release Detection** - Identifies and labels pre-release versions
-- **Unified Display** - Shows in popup Recent Activity with 🏷️ emoji
+- **Unified Display** - Shows in popup Recent Activity with 🏷️ emoji and platform label
 
 ### ⚙️ Customizable Settings
 - Enable/disable notifications globally
@@ -66,14 +67,14 @@ A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories
 
 ### 🛡️ Efficient & Secure
 - **Smart API usage** - Only fetches detailed commit info when SHA changes (50% API reduction)
-- **GitHub API rate limit management** - Tracks and displays remaining quota
+- **GitHub & GitLab API rate limit management** - Tracks and displays remaining quota
 - **Response caching** - Minimizes redundant API calls
 - **Batch processing** - 10 repos at a time with delays
-- **Secure Personal Access Token authentication**
+- **Secure Personal Access Token authentication** (GitHub & GitLab)
 - **No backend server required** - All data stays in your browser
 
 ### 🧠 Intelligent Features
-- **Structural analysis** - Detects merge commits by parent count (not message)
+- **Structural analysis** - Detects merge commits/MRs by parent count (not message)
 - **File pattern recognition** - Automatically identifies docs, config, CI/CD, tests
 - **Critical file detection** - Recognizes security, auth, core system files
 - **Change size analysis** - Detects large refactors and breaking changes
@@ -97,15 +98,21 @@ A Chrome Extension (Manifest v3) that intelligently monitors GitHub repositories
 1. Click the Commit Watch extension icon
 2. Go to **Settings** (gear icon)
 3. Generate a GitHub Personal Access Token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new) with these scopes:
-   - `repo` - Full control of private repositories
-   - `read:user` - Read user profile data
-   - `notifications` - Access notifications
-4. Paste the token and click **Save Token**
+  - `repo` - Full control of private repositories
+  - `read:user` - Read user profile data
+  - `notifications` - Access notifications
+   
+  Or generate a GitLab Personal Access Token at [gitlab.com/-/profile/personal_access_tokens](https://gitlab.com/-/profile/personal_access_tokens) with these scopes:
+  - `api` - Full API access
+  - `read_user` - Read user profile data
+  - `read_repository` - Read repository data
+4. Paste your GitHub and/or GitLab token(s) and click **Save Token**
 
 ## 🔧 Configuration
 
-### GitHub Personal Access Token
+### GitHub & GitLab Personal Access Tokens
 
+**GitHub:**
 Create a new token at [github.com/settings/tokens/new](https://github.com/settings/tokens/new?scopes=repo,read:user,notifications&description=Commit%20Watch%20Extension) with these required scopes:
 
 | Scope | Description |
@@ -114,12 +121,21 @@ Create a new token at [github.com/settings/tokens/new](https://github.com/settin
 | `read:user` | Read user profile information |
 | `notifications` | Access GitHub notifications |
 
+**GitLab:**
+Create a new token at [gitlab.com/-/profile/personal_access_tokens](https://gitlab.com/-/profile/personal_access_tokens) with these required scopes:
+
+| Scope | Description |
+|-------|-------------|
+| `api` | Full API access |
+| `read_user` | Read user profile information |
+| `read_repository` | Read repository data |
+
 ### Settings Options
 
 | Setting | Description | Default |
 |---------|-------------|---------|
 | Enable Notifications | Receive Chrome notifications for all activity | ✅ On |
-| Release Notifications | Monitor GitHub Releases and Git tags | ✅ On |
+| Release Notifications | Monitor GitHub & GitLab Releases and Git tags | ✅ On |
 | Check Frequency | How often to poll for commits/releases | 5 minutes |
 | Ignore Forks | Don't monitor forked repositories | ✅ On |
 | Ignore Own Commits | Don't notify for your commits | ❌ Off |
@@ -130,14 +146,14 @@ Create a new token at [github.com/settings/tokens/new](https://github.com/settin
 ```
 CommitWatch/
 ├── manifest.json          # Extension manifest (v3)
-├── background.js          # Service worker (polling, API, notifications)
+├── background.js          # Service worker (polling, API, notifications, GitHub & GitLab)
 ├── popup/
 │   ├── popup.html         # Popup UI markup
-│   ├── popup.js           # Popup interactions
+│   ├── popup.js           # Popup interactions (with platform filter)
 │   └── popup.css          # Popup styles
 ├── options/
 │   ├── options.html       # Settings page markup
-│   ├── options.js         # Settings interactions
+│   ├── options.js         # Settings interactions (GitHub & GitLab tokens)
 │   └── options.css        # Settings styles
 ├── icons/
 │   ├── icon.svg           # Source SVG icon
@@ -157,11 +173,11 @@ CommitWatch/
 │          Background Service Worker              │
 ├─────────────────────────────────────────────────┤
 │  • Periodic polling (chrome.alarms)            │
-│  • GitHub API integration                       │
+│  • GitHub & GitLab API integration              │
 │  • Intelligent commit analysis                  │
-│  • Release/tag monitoring                       │
-│  • Notification management                      │
-│  • Rate limit tracking                          │
+│  • Release/tag monitoring (GitHub & GitLab)     │
+│  • Notification management (platform-aware)     │
+│  • Rate limit tracking (GitHub & GitLab)        │
 └─────────────────────────────────────────────────┘
               ↓          ↓          ↓
     ┌──────────────┬──────────────┬──────────────┐
@@ -173,9 +189,9 @@ CommitWatch/
 1. **Service worker** uses `chrome.alarms` for periodic checks (default: 5 minutes)
 2. **Batch processing**: Fetches repositories in batches of 10 with 100ms delays
 3. **Smart fetching**: Only gets detailed commit info if SHA changed (API optimization)
-4. **Parallel checks**: Monitors commits, releases, and GitHub notifications simultaneously
+4. **Parallel checks**: Monitors commits, releases, and notifications for both GitHub and GitLab simultaneously
 5. **Intelligent classification**: Analyzes files, patterns, and changes automatically
-6. **Notification dispatch**: Creates Chrome notifications based on priority/type
+6. **Notification dispatch**: Creates Chrome notifications based on priority/type and platform
 
 ### Commit Analysis Pipeline
 ```
@@ -186,14 +202,15 @@ Fetch Commit → Analyze Type → Detect Critical Files → Calculate Priority �
 ```
 
 ### Release Detection
-1. **Try GitHub Releases API** (`/repos/{owner}/{repo}/releases/latest`)
-2. **Fallback to Tags** (`/repos/{owner}/{repo}/tags?per_page=1`) if no releases
+1. **Try GitHub Releases API** (`/repos/{owner}/{repo}/releases/latest`) or GitLab Releases API (`/projects/:id/releases`)
+2. **Fallback to Tags** (`/repos/{owner}/{repo}/tags?per_page=1` for GitHub, `/projects/:id/repository/tags` for GitLab) if no releases
 3. **Compare IDs** with stored values to detect new releases/tags
-4. **Send notifications** with 🏷️ emoji, version info, and pre-release labels
+4. **Send notifications** with 🏷️ emoji, version info, pre-release labels, and platform indication
 
 ### API Rate Limiting
 - **GitHub limits**: 5000 requests/hour for authenticated users
-- **Header tracking**: Monitors `X-RateLimit-Remaining` and `X-RateLimit-Reset`
+- **GitLab limits**: 600 requests/minute per IP (default)
+- **Header tracking**: Monitors `X-RateLimit-Remaining` and `X-RateLimit-Reset` (GitHub), `RateLimit-Remaining` (GitLab)
 - **Optimization**: Stores responses and only refetches when needed
 - **Caching**: Repository list cached for 1 hour
 - **Display**: Rate limit info shown in popup (e.g., "4850/5000 remaining")
@@ -278,7 +295,7 @@ const criticalPatterns = [
 
 - **No backend server** - All data stays in your browser
 - **Token storage** - PAT is stored in Chrome's secure local storage
-- **API calls** - Only made to `api.github.com`
+- **API calls** - Only made to `api.github.com` and `gitlab.com/api/v4`
 - **No tracking** - No analytics or telemetry
 
 ## 📄 License
@@ -296,6 +313,7 @@ MPL License - See [LICENSE](./LICENSE) file
 ## 🙏 Acknowledgments
 
 - [GitHub REST API](https://docs.github.com/en/rest)
+- [GitLab REST API](https://docs.gitlab.com/ee/api/)
 - [Chrome Extensions Documentation](https://developer.chrome.com/docs/extensions/mv3/)
 - GitHub Primer Design System (color inspiration)
 

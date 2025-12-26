@@ -651,6 +651,40 @@ input::placeholder {
   border-radius: var(--radius-sm);
 }
 
+.repo-tag.platform-tag {
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.repo-tag.platform-tag.github {
+  background-color: rgba(110, 118, 129, 0.2);
+  color: var(--color-text);
+}
+
+.repo-tag.platform-tag.gitlab {
+  background-color: rgba(252, 109, 38, 0.15);
+  color: #fc6d26;
+}
+
+.platform-icon-small {
+  flex-shrink: 0;
+}
+
+.platform-icon-small.github {
+  color: var(--color-text-muted);
+}
+
+.platform-icon-small.gitlab {
+  color: #fc6d26;
+}
+
+.platform-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
 .repo-lang {
   display: flex;
   align-items: center;

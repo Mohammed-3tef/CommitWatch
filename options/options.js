@@ -13,12 +13,28 @@
 // =============================================================================
 
 const elements = {
-  // Auth elements
+  // Auth elements - GitHub
   authStatus: document.getElementById('auth-status'),
   authForm: document.getElementById('auth-form'),
-  tokenInput: document.getElementById('token-input'),
-  showTokenBtn: document.getElementById('show-token-btn'),
-  saveTokenBtn: document.getElementById('save-token-btn'),
+  githubAuthSection: document.getElementById('github-auth-section'),
+  githubAuthStatus: document.getElementById('github-auth-status'),
+  githubAuthForm: document.getElementById('github-auth-form'),
+  githubTokenInput: document.getElementById('github-token-input'),
+  showGithubTokenBtn: document.getElementById('show-github-token-btn'),
+  saveGithubTokenBtn: document.getElementById('save-github-token-btn'),
+  
+  // Auth elements - GitLab
+  gitlabAuthSection: document.getElementById('gitlab-auth-section'),
+  gitlabAuthStatus: document.getElementById('gitlab-auth-status'),
+  gitlabAuthForm: document.getElementById('gitlab-auth-form'),
+  gitlabTokenInput: document.getElementById('gitlab-token-input'),
+  showGitlabTokenBtn: document.getElementById('show-gitlab-token-btn'),
+  saveGitlabTokenBtn: document.getElementById('save-gitlab-token-btn'),
+  
+  // Legacy elements (for backwards compatibility)
+  tokenInput: document.getElementById('github-token-input'),
+  showTokenBtn: document.getElementById('show-github-token-btn'),
+  saveTokenBtn: document.getElementById('save-github-token-btn'),
   
   // Settings elements
   notificationsEnabled: document.getElementById('notifications-enabled'),
@@ -148,49 +164,82 @@ async function initTheme() {
 // =============================================================================
 
 /**
- * Update authentication status display
+ * Update authentication status display for both platforms
  */
 async function updateAuthStatus() {
   const status = await sendMessage({ action: 'getStatus' });
   
-  if (status.authenticated && status.user) {
-    elements.authStatus.innerHTML = `
+  // Update GitHub auth status
+  if (status.githubAuthenticated && status.user) {
+    elements.githubAuthStatus.innerHTML = `
       <div class="auth-connected">
         <img src="${status.user.avatar_url}" alt="Avatar" class="avatar" />
         <div class="auth-info">
           <strong>${status.user.login}</strong>
           <span class="auth-email">${status.user.email || 'Connected to GitHub'}</span>
         </div>
-        <button id="disconnect-btn" class="btn btn-secondary btn-small">Disconnect</button>
+        <button id="disconnect-github-btn" class="btn btn-secondary btn-small">Disconnect</button>
       </div>
     `;
-    elements.authForm.classList.add('hidden');
+    elements.githubAuthForm.classList.add('hidden');
     
     // Add disconnect handler
-    document.getElementById('disconnect-btn').addEventListener('click', handleDisconnect);
-    
-    // Load repositories
-    await loadRepositories();
+    document.getElementById('disconnect-github-btn').addEventListener('click', handleDisconnectGitHub);
   } else {
-    elements.authStatus.innerHTML = `
+    elements.githubAuthStatus.innerHTML = `
       <div class="auth-disconnected">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/>
           <line x1="15" y1="9" x2="9" y2="15"/>
           <line x1="9" y1="9" x2="15" y2="15"/>
         </svg>
-        <span>Not connected to GitHub</span>
+        <span>Not connected</span>
       </div>
     `;
-    elements.authForm.classList.remove('hidden');
+    elements.githubAuthForm.classList.remove('hidden');
+  }
+  
+  // Update GitLab auth status
+  if (status.gitlabAuthenticated && status.gitlabUser) {
+    elements.gitlabAuthStatus.innerHTML = `
+      <div class="auth-connected">
+        <img src="${status.gitlabUser.avatar_url || '../icons/gitlab-default.png'}" alt="Avatar" class="avatar" />
+        <div class="auth-info">
+          <strong>${status.gitlabUser.login}</strong>
+          <span class="auth-email">${status.gitlabUser.email || 'Connected to GitLab'}</span>
+        </div>
+        <button id="disconnect-gitlab-btn" class="btn btn-secondary btn-small">Disconnect</button>
+      </div>
+    `;
+    elements.gitlabAuthForm.classList.add('hidden');
+    
+    // Add disconnect handler
+    document.getElementById('disconnect-gitlab-btn').addEventListener('click', handleDisconnectGitLab);
+  } else {
+    elements.gitlabAuthStatus.innerHTML = `
+      <div class="auth-disconnected">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <span>Not connected</span>
+      </div>
+    `;
+    elements.gitlabAuthForm.classList.remove('hidden');
+  }
+  
+  // Load repositories if at least one platform is connected
+  if (status.githubAuthenticated || status.gitlabAuthenticated) {
+    await loadRepositories();
   }
 }
 
 /**
- * Handle save token button click
+ * Handle save GitHub token button click
  */
-async function handleSaveToken() {
-  const token = elements.tokenInput.value.trim();
+async function handleSaveGitHubToken() {
+  const token = elements.githubTokenInput.value.trim();
   
   if (!token) {
     showToast('Please enter a token', 'error');
@@ -199,32 +248,32 @@ async function handleSaveToken() {
   
   // Validate token format
   if (!token.startsWith('ghp_') && !token.startsWith('github_pat_')) {
-    showToast('Invalid token format', 'error');
+    showToast('Invalid GitHub token format', 'error');
     return;
   }
   
-  elements.saveTokenBtn.disabled = true;
-  elements.saveTokenBtn.innerHTML = 'Saving...';
+  elements.saveGithubTokenBtn.disabled = true;
+  elements.saveGithubTokenBtn.innerHTML = 'Saving...';
   
   try {
     const response = await sendMessage({
-      action: 'authenticate',
+      action: 'authenticateGitHub',
       token: token
     });
     
     if (response.success) {
-      elements.tokenInput.value = '';
+      elements.githubTokenInput.value = '';
       showToast('Successfully connected to GitHub!', 'success');
       await updateAuthStatus();
       await loadSettings();
     } else {
-      showToast(response.error || 'Authentication failed', 'error');
+      showToast(response.error || 'GitHub authentication failed', 'error');
     }
   } catch (error) {
     showToast('Connection failed', 'error');
   } finally {
-    elements.saveTokenBtn.disabled = false;
-    elements.saveTokenBtn.innerHTML = `
+    elements.saveGithubTokenBtn.disabled = false;
+    elements.saveGithubTokenBtn.innerHTML = `
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
         <polyline points="17 21 17 13 7 13 7 21"/>
@@ -236,11 +285,68 @@ async function handleSaveToken() {
 }
 
 /**
- * Handle disconnect button click
+ * Handle save GitLab token button click
  */
-async function handleDisconnect() {
+async function handleSaveGitLabToken() {
+  const token = elements.gitlabTokenInput.value.trim();
+  
+  if (!token) {
+    showToast('Please enter a token', 'error');
+    return;
+  }
+  
+  // GitLab tokens are typically 20+ chars, but don't enforce glpat- prefix
+  // as self-hosted instances may have different formats
+  if (token.length < 20) {
+    showToast('Token seems too short. Please enter a valid GitLab Personal Access Token.', 'error');
+    return;
+  }
+  
+  elements.saveGitlabTokenBtn.disabled = true;
+  elements.saveGitlabTokenBtn.innerHTML = 'Saving...';
+  
   try {
-    await sendMessage({ action: 'logout' });
+    const response = await sendMessage({
+      action: 'authenticateGitLab',
+      token: token
+    });
+    
+    if (response.success) {
+      elements.gitlabTokenInput.value = '';
+      showToast('Successfully connected to GitLab!', 'success');
+      await updateAuthStatus();
+      await loadSettings();
+    } else {
+      showToast(response.error || 'GitLab authentication failed', 'error');
+    }
+  } catch (error) {
+    showToast('Connection failed', 'error');
+  } finally {
+    elements.saveGitlabTokenBtn.disabled = false;
+    elements.saveGitlabTokenBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/>
+        <polyline points="17 21 17 13 7 13 7 21"/>
+        <polyline points="7 3 7 8 15 8"/>
+      </svg>
+      Save Token
+    `;
+  }
+}
+
+/**
+ * Handle save token button click (legacy - routes to GitHub)
+ */
+async function handleSaveToken() {
+  return handleSaveGitHubToken();
+}
+
+/**
+ * Handle GitHub disconnect button click
+ */
+async function handleDisconnectGitHub() {
+  try {
+    await sendMessage({ action: 'logoutGitHub' });
     showToast('Disconnected from GitHub', 'info');
     await updateAuthStatus();
   } catch (error) {
@@ -249,11 +355,45 @@ async function handleDisconnect() {
 }
 
 /**
- * Handle show/hide token button
+ * Handle GitLab disconnect button click
+ */
+async function handleDisconnectGitLab() {
+  try {
+    await sendMessage({ action: 'logoutGitLab' });
+    showToast('Disconnected from GitLab', 'info');
+    await updateAuthStatus();
+  } catch (error) {
+    showToast('Failed to disconnect', 'error');
+  }
+}
+
+/**
+ * Handle disconnect button click (legacy - disconnects all)
+ */
+async function handleDisconnect() {
+  try {
+    await sendMessage({ action: 'logout' });
+    showToast('Disconnected from all platforms', 'info');
+    await updateAuthStatus();
+  } catch (error) {
+    showToast('Failed to disconnect', 'error');
+  }
+}
+
+/**
+ * Handle show/hide token button for a specific input
+ * @param {HTMLInputElement} input - Token input element  
+ */
+function handleToggleTokenFor(input) {
+  const isPassword = input.type === 'password';
+  input.type = isPassword ? 'text' : 'password';
+}
+
+/**
+ * Handle show/hide token button (legacy)
  */
 function handleToggleToken() {
-  const isPassword = elements.tokenInput.type === 'password';
-  elements.tokenInput.type = isPassword ? 'text' : 'password';
+  handleToggleTokenFor(elements.githubTokenInput);
 }
 
 // =============================================================================
@@ -357,13 +497,31 @@ async function renderRepositories(repos) {
   const enabledRepos = response.settings?.enabledRepos || {};
   
   const repoHtml = repos.map(repo => {
-    // Default to enabled unless explicitly disabled
-    const isEnabled = enabledRepos[repo.full_name] !== false;
+    // Use platform-specific key for enabled status
+    const platform = repo.platform || 'github';
+    const repoKey = `${platform}:${repo.full_name}`;
+    // Check both old and new key formats for backwards compatibility
+    const isEnabled = enabledRepos[repoKey] !== false && enabledRepos[repo.full_name] !== false;
+    
+    // Generate platform-specific URL
+    const repoUrl = platform === 'gitlab' 
+      ? `https://gitlab.com/${repo.full_name}` 
+      : `https://github.com/${repo.full_name}`;
+    
+    // Platform icon
+    const platformIcon = platform === 'gitlab' 
+      ? `<svg class="platform-icon-small gitlab" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+           <path d="M22.65 14.39L12 22.13 1.35 14.39a.84.84 0 0 1-.3-.94l1.22-3.78 2.44-7.51A.42.42 0 0 1 4.82 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.49h8.1l2.44-7.51A.42.42 0 0 1 18.6 2a.43.43 0 0 1 .58 0 .42.42 0 0 1 .11.18l2.44 7.51L23 13.45a.84.84 0 0 1-.35.94z"/>
+         </svg>`
+      : `<svg class="platform-icon-small github" width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+           <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+         </svg>`;
     
     return `
-      <div class="repo-item" data-repo="${repo.full_name}">
+      <div class="repo-item" data-repo="${repoKey}" data-platform="${platform}">
         <div class="repo-info">
           <div class="repo-name">
+            ${platformIcon}
             ${repo.private ? `
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
@@ -374,16 +532,17 @@ async function renderRepositories(repos) {
                 <path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>
               </svg>
             `}
-            <a href="https://github.com/${repo.full_name}" target="_blank">${repo.full_name}</a>
+            <a href="${repoUrl}" target="_blank">${repo.full_name}</a>
           </div>
           <div class="repo-meta">
+            <span class="repo-tag platform-tag ${platform}">${platform === 'gitlab' ? 'GitLab' : 'GitHub'}</span>
             ${repo.fork ? '<span class="repo-tag">Fork</span>' : ''}
             ${repo.language ? `<span class="repo-lang">${repo.language}</span>` : ''}
             <span class="repo-branch">${repo.default_branch}</span>
           </div>
         </div>
         <label class="toggle">
-          <input type="checkbox" class="repo-toggle" data-repo="${repo.full_name}" ${isEnabled ? 'checked' : ''} />
+          <input type="checkbox" class="repo-toggle" data-repo="${repoKey}" ${isEnabled ? 'checked' : ''} />
           <span class="toggle-slider"></span>
         </label>
       </div>
@@ -536,11 +695,18 @@ async function handleDisableAll() {
  * Initialize all event listeners
  */
 function initEventListeners() {
-  // Auth
+  // Auth - GitHub
   elements.saveTokenBtn.addEventListener('click', handleSaveToken);
   elements.showTokenBtn.addEventListener('click', handleToggleToken);
   elements.tokenInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') handleSaveToken();
+  });
+  
+  // Auth - GitLab
+  elements.saveGitlabTokenBtn.addEventListener('click', handleSaveGitLabToken);
+  elements.showGitlabTokenBtn.addEventListener('click', () => handleToggleTokenFor(elements.gitlabTokenInput));
+  elements.gitlabTokenInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleSaveGitLabToken();
   });
   
   // Settings

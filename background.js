@@ -10,10 +10,60 @@
  */
 
 // =============================================================================
+/**
+ * Truncate a string to a max length, adding ellipsis if needed.
+ */
+function truncate(str, max = 40) {
+  return str.length > max ? str.slice(0, max - 1) + '…' : str;
+}
+
+/**
+ * Unified Chrome notification creator for all types.
+ * @param {Object} opts - Notification options
+ * @param {string} opts.id - Notification ID
+ * @param {string} opts.platformName - 'GitHub' or 'GitLab'
+ * @param {string} opts.repoName - Repository full name
+ * @param {string} opts.title - Main title/message
+ * @param {string} opts.message - Body message
+ * @param {string} opts.contextMessage - Context message
+ * @param {Array} opts.buttons - Notification buttons
+ * @param {number} opts.priority - 0/1/2
+ * @param {boolean} opts.requireInteraction
+ * @param {boolean} opts.silent
+ */
+async function createUnifiedNotification({
+  id,
+  platformName,
+  repoName,
+  title,
+  message,
+  contextMessage,
+  buttons = [],
+  priority = 0,
+  requireInteraction = false,
+  silent = false
+}) {
+  try {
+    await chrome.notifications.create(id, {
+      type: 'basic',
+      iconUrl: 'icons/icon128.png',
+      title: `[${platformName}] ${truncate(repoName)}`,
+      message: title + (message ? `\n${message}` : ''),
+      contextMessage,
+      priority,
+      requireInteraction,
+      silent,
+      buttons
+    });
+  } catch (err) {
+    console.error('[Commit Watch] Notification error:', err, id);
+  }
+}
 // CONSTANTS & CONFIGURATION
 // =============================================================================
 
 const GITHUB_API_BASE = 'https://api.github.com';
+const GITLAB_API_BASE = 'https://gitlab.com/api/v4';
 const ALARM_NAME = 'commit-check-alarm';
 const DEFAULT_CHECK_INTERVAL = 5; // minutes
 
@@ -97,7 +147,7 @@ async function getSettings() {
     checkInterval: DEFAULT_CHECK_INTERVAL,
     ignoreForks: true,
     ignoreOwnCommits: false,
-    enabledRepos: {}, // { 'owner/repo': true/false }
+    enabledRepos: {}, // { 'platform:owner/repo': true/false }
     notificationsEnabled: true,
     releaseNotificationsEnabled: true, // Monitor new releases
     ...settings
@@ -112,7 +162,7 @@ async function getSettings() {
  * Get stored GitHub access token
  * @returns {Promise<string|null>} Access token or null
  */
-async function getAccessToken() {
+async function getGitHubAccessToken() {
   const { githubToken } = await getStorage('githubToken');
   return githubToken || null;
 }
@@ -121,8 +171,43 @@ async function getAccessToken() {
  * Store GitHub access token
  * @param {string} token - Access token to store
  */
-async function setAccessToken(token) {
+async function setGitHubAccessToken(token) {
   await setStorage({ githubToken: token });
+}
+
+/**
+ * Get stored GitLab access token
+ * @returns {Promise<string|null>} Access token or null
+ */
+async function getGitLabAccessToken() {
+  const { gitlabToken } = await getStorage('gitlabToken');
+  return gitlabToken || null;
+}
+
+/**
+ * Store GitLab access token
+ * @param {string} token - Access token to store
+ */
+async function setGitLabAccessToken(token) {
+  await setStorage({ gitlabToken: token });
+}
+
+/**
+ * Get stored access token (legacy support - returns GitHub token)
+ * @returns {Promise<string|null>} Access token or null
+ * @deprecated Use getGitHubAccessToken or getGitLabAccessToken
+ */
+async function getAccessToken() {
+  return getGitHubAccessToken();
+}
+
+/**
+ * Store access token (legacy support - stores as GitHub token)
+ * @param {string} token - Access token to store
+ * @deprecated Use setGitHubAccessToken or setGitLabAccessToken
+ */
+async function setAccessToken(token) {
+  await setGitHubAccessToken(token);
 }
 
 /**
@@ -183,11 +268,11 @@ async function authenticateWithGitHub() {
 }
 
 /**
- * Check if user is authenticated
+ * Check if user is authenticated to GitHub
  * @returns {Promise<boolean>}
  */
-async function isAuthenticated() {
-  const token = await getAccessToken();
+async function isGitHubAuthenticated() {
+  const token = await getGitHubAccessToken();
   if (!token) return false;
   
   try {
@@ -200,10 +285,45 @@ async function isAuthenticated() {
 }
 
 /**
- * Log out user by clearing stored token
+ * Check if user is authenticated to GitLab
+ * @returns {Promise<boolean>}
+ */
+async function isGitLabAuthenticated() {
+  const token = await getGitLabAccessToken();
+  if (!token) return false;
+  
+  try {
+    // Verify token is still valid
+    const response = await fetchGitLab('/user');
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if user is authenticated to at least one platform
+ * @returns {Promise<boolean>}
+ */
+async function isAuthenticated() {
+  const [github, gitlab] = await Promise.all([
+    isGitHubAuthenticated(),
+    isGitLabAuthenticated()
+  ]);
+  return github || gitlab;
+}
+
+/**
+ * Log out user by clearing stored tokens
  */
 async function logout() {
-  await chrome.storage.local.remove(['githubToken', 'userData', 'repositories', 'lastCommits']);
+  await chrome.storage.local.remove([
+    'githubToken', 'gitlabToken', 
+    'userData', 'gitlabUserData',
+    'repositories', 'gitlabRepositories',
+    'lastCommits', 'gitlabLastCommits',
+    'lastReleases', 'gitlabLastReleases'
+  ]);
   await stopPolling();
 }
 
@@ -311,6 +431,156 @@ async function fetchGitHubCached(endpoint, cacheKey, maxAge = 5 * 60 * 1000) {
 // =============================================================================
 
 /**
+ * Rate limit tracking for GitLab
+ * GitLab API allows 2000 requests/minute for authenticated users
+ */
+let gitlabRateLimitRemaining = 2000;
+let gitlabRateLimitReset = null;
+
+/**
+ * Make authenticated request to GitLab API
+ * 
+ * @param {string} endpoint - API endpoint (e.g., '/projects')
+ * @param {Object} options - Fetch options
+ * @returns {Promise<Response>}
+ */
+async function fetchGitLab(endpoint, options = {}) {
+  const token = await getGitLabAccessToken();
+  
+  if (!token) {
+    throw new Error('Not authenticated to GitLab');
+  }
+  
+  // Check rate limit before making request
+  if (gitlabRateLimitRemaining <= 10 && gitlabRateLimitReset) {
+    const now = Date.now() / 1000;
+    if (now < gitlabRateLimitReset) {
+      const waitTime = Math.ceil((gitlabRateLimitReset - now) / 60);
+      throw new Error(`GitLab rate limit exceeded. Resets in ${waitTime} minutes.`);
+    }
+  }
+  
+  const url = endpoint.startsWith('http') ? endpoint : `${GITLAB_API_BASE}${endpoint}`;
+  
+  const response = await fetch(url, {
+    ...options,
+    headers: {
+      'PRIVATE-TOKEN': token,
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
+  });
+  
+  // Update rate limit tracking from response headers
+  gitlabRateLimitRemaining = parseInt(response.headers.get('RateLimit-Remaining') || '2000');
+  gitlabRateLimitReset = parseInt(response.headers.get('RateLimit-Reset') || '0');
+  
+  // Store rate limit info for display in popup
+  const { rateLimit = {} } = await getStorage('rateLimit');
+  await setStorage({
+    gitlabRateLimit: {
+      remaining: gitlabRateLimitRemaining,
+      reset: gitlabRateLimitReset,
+      limit: parseInt(response.headers.get('RateLimit-Limit') || '2000')
+    }
+  });
+  
+  return response;
+}
+
+/**
+ * Fetch all GitLab projects the user is a member of
+ * Uses pagination to get all projects
+ * 
+ * @returns {Promise<Array>} List of projects (normalized to match GitHub format)
+ */
+async function fetchGitLabProjects() {
+  const settings = await getSettings();
+  const projects = [];
+  let page = 1;
+  let hasMore = true;
+  
+  // Fetch all pages of projects
+  while (hasMore) {
+    const response = await fetchGitLab(
+      `/projects?membership=true&per_page=100&page=${page}`
+    );
+    
+    if (!response.ok) {
+      throw new Error(`Failed to fetch GitLab projects: ${response.status}`);
+    }
+    
+    const pageProjects = await response.json();
+    
+    if (pageProjects.length === 0) {
+      hasMore = false;
+    } else {
+      // Normalize GitLab projects to match GitHub repo format
+      const normalizedProjects = pageProjects
+        .filter(project => !settings.ignoreForks || !project.forked_from_project)
+        .map(project => normalizeGitLabProject(project));
+      
+      projects.push(...normalizedProjects);
+      page++;
+    }
+    
+    // Safety limit to prevent infinite loops
+    if (page > 50) break;
+  }
+  
+  // Cache projects
+  await setStorage({ 
+    gitlabRepositories: projects,
+    gitlabRepositoriesUpdated: Date.now()
+  });
+  
+  return projects;
+}
+
+/**
+ * Normalize GitLab project to match GitHub repository format
+ * @param {Object} project - GitLab project object
+ * @returns {Object} Normalized project object
+ */
+function normalizeGitLabProject(project) {
+  return {
+    id: project.id,
+    name: project.name,
+    full_name: project.path_with_namespace,
+    private: project.visibility !== 'public',
+    fork: !!project.forked_from_project,
+    default_branch: project.default_branch || 'main',
+    language: null, // GitLab doesn't return this in project list
+    html_url: project.web_url,
+    platform: 'gitlab',
+    owner: {
+      login: project.namespace?.path || project.path_with_namespace.split('/')[0],
+      avatar_url: project.avatar_url || project.namespace?.avatar_url
+    }
+  };
+}
+
+/**
+ * Get GitLab projects from cache or fetch fresh
+ * @returns {Promise<Array>}
+ */
+async function getGitLabRepositories() {
+  const { gitlabRepositories, gitlabRepositoriesUpdated } = await getStorage(['gitlabRepositories', 'gitlabRepositoriesUpdated']);
+  
+  // Refresh if cache is older than 1 hour
+  if (!gitlabRepositories || Date.now() - gitlabRepositoriesUpdated > 60 * 60 * 1000) {
+    return fetchGitLabProjects();
+  }
+  
+  // Ensure all cached repos have platform field (for backwards compatibility)
+  return gitlabRepositories.map(repo => ({ ...repo, platform: repo.platform || 'gitlab' }));
+}
+
+// =============================================================================
+// GITHUB REPOSITORY MANAGEMENT
+// =============================================================================
+
+/**
  * Fetch all repositories the user is involved in
  * Uses pagination to get all repos
  * 
@@ -337,10 +607,10 @@ async function fetchUserRepositories() {
     if (pageRepos.length === 0) {
       hasMore = false;
     } else {
-      // Filter forks if setting is enabled
-      const filteredRepos = settings.ignoreForks 
-        ? pageRepos.filter(repo => !repo.fork)
-        : pageRepos;
+      // Filter forks if setting is enabled and add platform identifier
+      const filteredRepos = pageRepos
+        .filter(repo => !settings.ignoreForks || !repo.fork)
+        .map(repo => ({ ...repo, platform: 'github' }));
       
       repos.push(...filteredRepos);
       page++;
@@ -360,10 +630,10 @@ async function fetchUserRepositories() {
 }
 
 /**
- * Get repositories from cache or fetch fresh
+ * Get GitHub repositories from cache or fetch fresh
  * @returns {Promise<Array>}
  */
-async function getRepositories() {
+async function getGitHubRepositories() {
   const { repositories, repositoriesUpdated } = await getStorage(['repositories', 'repositoriesUpdated']);
   
   // Refresh if cache is older than 1 hour
@@ -371,7 +641,50 @@ async function getRepositories() {
     return fetchUserRepositories();
   }
   
-  return repositories;
+  // Ensure all cached repos have platform field (for backwards compatibility)
+  return repositories.map(repo => ({ ...repo, platform: repo.platform || 'github' }));
+}
+
+/**
+ * Get all repositories from both GitHub and GitLab
+ * @returns {Promise<Array>}
+ */
+async function getRepositories() {
+  const repos = [];
+  
+  // Fetch from both platforms in parallel
+  const [githubAuth, gitlabAuth] = await Promise.all([
+    isGitHubAuthenticated(),
+    isGitLabAuthenticated()
+  ]);
+  
+  const fetchPromises = [];
+  
+  if (githubAuth) {
+    fetchPromises.push(
+      getGitHubRepositories().catch(err => {
+        console.error('[Commit Watch] Error fetching GitHub repos:', err);
+        return [];
+      })
+    );
+  }
+  
+  if (gitlabAuth) {
+    fetchPromises.push(
+      getGitLabRepositories().catch(err => {
+        console.error('[Commit Watch] Error fetching GitLab repos:', err);
+        return [];
+      })
+    );
+  }
+  
+  const results = await Promise.all(fetchPromises);
+  
+  for (const result of results) {
+    repos.push(...result);
+  }
+  
+  return repos;
 }
 
 // =============================================================================
@@ -702,13 +1015,13 @@ function classifyCommitPriority(commit, repo, userData) {
 }
 
 /**
- * Fetch latest commit for a repository's default branch with full details
+ * Fetch latest commit for a GitHub repository's default branch with full details
  * 
  * @param {Object} repo - Repository object
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit with files or null
  */
-async function fetchLatestCommit(repo, lastKnownSha = null) {
+async function fetchLatestGitHubCommit(repo, lastKnownSha = null) {
   try {
     // First get the latest commit SHA (lightweight request)
     const listResponse = await fetchGitHub(
@@ -747,9 +1060,110 @@ async function fetchLatestCommit(repo, lastKnownSha = null) {
     
     return await detailResponse.json();
   } catch (error) {
-    console.error(`Error fetching commits for ${repo.full_name}:`, error);
+    console.error(`Error fetching GitHub commits for ${repo.full_name}:`, error);
     return null;
   }
+}
+
+/**
+ * Fetch latest commit for a GitLab project's default branch with full details
+ * 
+ * @param {Object} repo - Repository/project object
+ * @param {string} lastKnownSha - Last known commit SHA (for comparison)
+ * @returns {Promise<Object|null>} Latest commit normalized to GitHub format or null
+ */
+async function fetchLatestGitLabCommit(repo, lastKnownSha = null) {
+  try {
+    const projectId = encodeURIComponent(repo.full_name);
+    
+    // Get the latest commit
+    const listResponse = await fetchGitLab(
+      `/projects/${projectId}/repository/commits?ref_name=${repo.default_branch}&per_page=1`
+    );
+    
+    if (!listResponse.ok) {
+      if (listResponse.status === 404) {
+        // Empty repository or no access
+        return null;
+      }
+      throw new Error(`Failed to fetch GitLab commits: ${listResponse.status}`);
+    }
+    
+    const commits = await listResponse.json();
+    if (!commits[0]) return null;
+    
+    const latestSha = commits[0].id;
+    
+    // Optimization: If SHA hasn't changed, return basic info only
+    if (lastKnownSha && latestSha === lastKnownSha) {
+      return { sha: latestSha, unchanged: true };
+    }
+    
+    // Fetch commit diff to get file changes (only if SHA changed)
+    let files = [];
+    let stats = { additions: 0, deletions: 0 };
+    
+    try {
+      const diffResponse = await fetchGitLab(
+        `/projects/${projectId}/repository/commits/${latestSha}/diff`
+      );
+      
+      if (diffResponse.ok) {
+        const diffs = await diffResponse.json();
+        files = diffs.map(diff => ({
+          filename: diff.new_path || diff.old_path,
+          additions: (diff.diff?.match(/^\+[^+]/gm) || []).length,
+          deletions: (diff.diff?.match(/^-[^-]/gm) || []).length,
+          changes: diff.diff ? diff.diff.split('\n').length : 0
+        }));
+        
+        stats.additions = files.reduce((sum, f) => sum + f.additions, 0);
+        stats.deletions = files.reduce((sum, f) => sum + f.deletions, 0);
+      }
+    } catch (e) {
+      console.warn(`Could not fetch diff for ${repo.full_name}:`, e);
+    }
+    
+    // Normalize GitLab commit to GitHub format
+    const commit = commits[0];
+    return {
+      sha: commit.id,
+      commit: {
+        message: commit.message,
+        author: {
+          name: commit.author_name,
+          email: commit.author_email,
+          date: commit.authored_date
+        }
+      },
+      author: {
+        login: commit.author_name,
+        avatar_url: null
+      },
+      html_url: commit.web_url,
+      parents: commit.parent_ids?.map(id => ({ sha: id })) || [],
+      files,
+      stats
+    };
+  } catch (error) {
+    console.error(`Error fetching GitLab commits for ${repo.full_name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Fetch latest commit for a repository's default branch with full details
+ * Routes to the appropriate platform-specific function
+ * 
+ * @param {Object} repo - Repository object
+ * @param {string} lastKnownSha - Last known commit SHA (for comparison)
+ * @returns {Promise<Object|null>} Latest commit with files or null
+ */
+async function fetchLatestCommit(repo, lastKnownSha = null) {
+  if (repo.platform === 'gitlab') {
+    return fetchLatestGitLabCommit(repo, lastKnownSha);
+  }
+  return fetchLatestGitHubCommit(repo, lastKnownSha);
 }
 
 /**
@@ -758,16 +1172,21 @@ async function fetchLatestCommit(repo, lastKnownSha = null) {
  * @param {Object} repo - Repository to check
  * @param {Object} lastCommits - Object containing last known commit SHAs
  * @param {Object} settings - User settings
- * @param {Object} userData - Current user data
+ * @param {Object} userData - GitHub user data
+ * @param {Object} gitlabUserData - GitLab user data
  * @returns {Promise<Object|null>} New commit info or null
  */
-async function checkRepoForNewCommits(repo, lastCommits, settings, userData) {
-  // Skip if repo is disabled in settings
-  if (settings.enabledRepos[repo.full_name] === false) {
+async function checkRepoForNewCommits(repo, lastCommits, settings, userData, gitlabUserData) {
+  // Use platform-specific key for repo settings
+  const repoKey = `${repo.platform || 'github'}:${repo.full_name}`;
+  
+  // Skip if repo is disabled in settings (check both old and new key formats)
+  if (settings.enabledRepos[repoKey] === false || settings.enabledRepos[repo.full_name] === false) {
     return null;
   }
   
-  const lastKnownSha = lastCommits[repo.full_name];
+  // Use platform-specific key for last commits
+  const lastKnownSha = lastCommits[repoKey] || lastCommits[repo.full_name];
   const latestCommit = await fetchLatestCommit(repo, lastKnownSha);
   
   if (!latestCommit) {
@@ -781,7 +1200,7 @@ async function checkRepoForNewCommits(repo, lastCommits, settings, userData) {
   
   // If this is the first check, just store the SHA
   if (!lastKnownSha) {
-    return { repo, commit: latestCommit, isNew: false };
+    return { repo, commit: latestCommit, isNew: false, repoKey };
   }
   
   // Check if there's a new commit
@@ -789,19 +1208,22 @@ async function checkRepoForNewCommits(repo, lastCommits, settings, userData) {
     // Skip own commits if setting is enabled
     if (settings.ignoreOwnCommits) {
       const authorLogin = latestCommit.author?.login;
-      if (authorLogin === userData.login) {
-        return { repo, commit: latestCommit, isNew: false };
+      const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
+      if (currentUser && authorLogin === currentUser.login) {
+        return { repo, commit: latestCommit, isNew: false, repoKey };
       }
     }
     
     // New commit found!
-    const priority = classifyCommitPriority(latestCommit, repo, userData);
+    const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
+    const priority = classifyCommitPriority(latestCommit, repo, currentUser);
     
     return {
       repo,
       commit: latestCommit,
       isNew: true,
-      priority
+      priority,
+      repoKey
     };
   }
   
@@ -823,14 +1245,14 @@ async function checkAllRepositoriesForCommits() {
       return;
     }
     
-    // Get current user info
-    const { userData } = await getStorage('userData');
-    if (!userData) {
+    // Get current user info for both platforms
+    const { userData, gitlabUserData } = await getStorage(['userData', 'gitlabUserData']);
+    if (!userData && !gitlabUserData) {
       console.log('[Commit Watch] No user data, skipping check');
       return;
     }
     
-    // Get repositories
+    // Get repositories from all platforms
     const repos = await getRepositories();
     
     // Get last known commits
@@ -847,13 +1269,14 @@ async function checkAllRepositoriesForCommits() {
       const batch = repos.slice(i, i + batchSize);
       
       const results = await Promise.all(
-        batch.map(repo => checkRepoForNewCommits(repo, lastCommits, settings, userData))
+        batch.map(repo => checkRepoForNewCommits(repo, lastCommits, settings, userData, gitlabUserData))
       );
       
       for (const result of results) {
         if (result) {
-          // Update last known commit
-          updatedLastCommits[result.repo.full_name] = result.commit.sha;
+          // Update last known commit using platform-specific key
+          const key = result.repoKey || result.repo.full_name;
+          updatedLastCommits[key] = result.commit.sha;
           
           // Track new commits for notification
           if (result.isNew) {
@@ -899,12 +1322,12 @@ async function checkAllRepositoriesForCommits() {
 // =============================================================================
 
 /**
- * Fetch the latest release for a repository
+ * Fetch the latest release for a GitHub repository
  * 
  * @param {Object} repo - Repository object
  * @returns {Promise<Object|null>} Latest release or null
  */
-async function fetchLatestRelease(repo) {
+async function fetchLatestGitHubRelease(repo) {
   try {
     const response = await fetchGitHub(
       `/repos/${repo.full_name}/releases/latest`
@@ -920,19 +1343,19 @@ async function fetchLatestRelease(repo) {
     
     return await response.json();
   } catch (error) {
-    console.error(`Error fetching releases for ${repo.full_name}:`, error);
+    console.error(`Error fetching GitHub releases for ${repo.full_name}:`, error);
     return null;
   }
 }
 
 /**
- * Fetch the latest tag for a repository
+ * Fetch the latest tag for a GitHub repository
  * Fallback when no formal releases exist
  * 
  * @param {Object} repo - Repository object
  * @returns {Promise<Object|null>} Latest tag or null
  */
-async function fetchLatestTag(repo) {
+async function fetchLatestGitHubTag(repo) {
   try {
     const response = await fetchGitHub(
       `/repos/${repo.full_name}/tags?per_page=1`
@@ -961,9 +1384,119 @@ async function fetchLatestTag(repo) {
       isTag: true
     };
   } catch (error) {
-    console.error(`Error fetching tags for ${repo.full_name}:`, error);
+    console.error(`Error fetching GitHub tags for ${repo.full_name}:`, error);
     return null;
   }
+}
+
+/**
+ * Fetch the latest release for a GitLab project
+ * 
+ * @param {Object} repo - Repository/project object
+ * @returns {Promise<Object|null>} Latest release (normalized) or null
+ */
+async function fetchLatestGitLabRelease(repo) {
+  try {
+    const projectId = encodeURIComponent(repo.full_name);
+    const response = await fetchGitLab(
+      `/projects/${projectId}/releases?per_page=1`
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch GitLab releases: ${response.status}`);
+    }
+    
+    const releases = await response.json();
+    if (!releases || releases.length === 0) {
+      return null;
+    }
+    
+    // Normalize GitLab release to match GitHub format
+    const release = releases[0];
+    return {
+      id: release.tag_name, // GitLab doesn't have numeric IDs for releases
+      tag_name: release.tag_name,
+      name: release.name || release.tag_name,
+      html_url: release._links?.self || `https://gitlab.com/${repo.full_name}/-/releases/${release.tag_name}`,
+      prerelease: false, // GitLab doesn't have prerelease concept
+      author: release.author ? { login: release.author.username } : null,
+      created_at: release.released_at
+    };
+  } catch (error) {
+    console.error(`Error fetching GitLab releases for ${repo.full_name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Fetch the latest tag for a GitLab project
+ * Fallback when no formal releases exist
+ * 
+ * @param {Object} repo - Repository/project object
+ * @returns {Promise<Object|null>} Latest tag (normalized) or null
+ */
+async function fetchLatestGitLabTag(repo) {
+  try {
+    const projectId = encodeURIComponent(repo.full_name);
+    const response = await fetchGitLab(
+      `/projects/${projectId}/repository/tags?per_page=1`
+    );
+    
+    if (!response.ok) {
+      if (response.status === 404) {
+        return null;
+      }
+      throw new Error(`Failed to fetch GitLab tags: ${response.status}`);
+    }
+    
+    const tags = await response.json();
+    if (!tags || tags.length === 0) {
+      return null;
+    }
+    
+    // Convert tag to release-like format for consistency
+    const tag = tags[0];
+    return {
+      id: tag.commit.id,
+      tag_name: tag.name,
+      name: tag.name,
+      html_url: `https://gitlab.com/${repo.full_name}/-/tags/${tag.name}`,
+      prerelease: false,
+      isTag: true
+    };
+  } catch (error) {
+    console.error(`Error fetching GitLab tags for ${repo.full_name}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Fetch the latest release for a repository (routes to platform-specific function)
+ * 
+ * @param {Object} repo - Repository object
+ * @returns {Promise<Object|null>} Latest release or null
+ */
+async function fetchLatestRelease(repo) {
+  if (repo.platform === 'gitlab') {
+    return fetchLatestGitLabRelease(repo);
+  }
+  return fetchLatestGitHubRelease(repo);
+}
+
+/**
+ * Fetch the latest tag for a repository (routes to platform-specific function)
+ * 
+ * @param {Object} repo - Repository object
+ * @returns {Promise<Object|null>} Latest tag or null
+ */
+async function fetchLatestTag(repo) {
+  if (repo.platform === 'gitlab') {
+    return fetchLatestGitLabTag(repo);
+  }
+  return fetchLatestGitHubTag(repo);
 }
 
 /**
@@ -975,8 +1508,11 @@ async function fetchLatestTag(repo) {
  * @returns {Promise<Object|null>} New release/tag info or null
  */
 async function checkRepoForNewReleases(repo, lastReleases, settings) {
-  // Skip if repo is disabled in settings
-  if (settings.enabledRepos[repo.full_name] === false) {
+  // Use platform-specific key for repo settings
+  const repoKey = `${repo.platform || 'github'}:${repo.full_name}`;
+  
+  // Skip if repo is disabled in settings (check both old and new key formats)
+  if (settings.enabledRepos[repoKey] === false || settings.enabledRepos[repo.full_name] === false) {
     return null;
   }
   
@@ -992,11 +1528,12 @@ async function checkRepoForNewReleases(repo, lastReleases, settings) {
     return null;
   }
   
-  const lastKnownId = lastReleases[repo.full_name];
+  // Use platform-specific key for last releases
+  const lastKnownId = lastReleases[repoKey] || lastReleases[repo.full_name];
   
   // If this is the first check, just store the ID (don't notify to avoid spam)
   if (!lastKnownId) {
-    return { repo, release: latestRelease, isNew: false };
+    return { repo, release: latestRelease, isNew: false, repoKey };
   }
   
   // Check if there's a new release/tag
@@ -1005,7 +1542,8 @@ async function checkRepoForNewReleases(repo, lastReleases, settings) {
     return {
       repo,
       release: latestRelease,
-      isNew: true
+      isNew: true,
+      repoKey
     };
   }
   
@@ -1051,8 +1589,9 @@ async function checkAllRepositoriesForReleases() {
       
       for (const result of results) {
         if (result) {
-          // Update last known release
-          updatedLastReleases[result.repo.full_name] = result.release.id;
+          // Update last known release using platform-specific key
+          const key = result.repoKey || result.repo.full_name;
+          updatedLastReleases[key] = result.release.id;
           
           // Track new releases for notification
           if (result.isNew) {
@@ -1102,7 +1641,8 @@ async function sendReleaseNotification(repo, release) {
     return;
   }
   
-  const notificationId = `release-${repo.full_name}-${release.id}`;
+  const platform = repo.platform || 'github';
+  const notificationId = `${platform}-release-${repo.full_name}-${release.id}`;
   const tagName = release.tag_name || 'Unknown';
   const releaseName = release.name || tagName;
   const isPrerelease = release.prerelease;
@@ -1111,6 +1651,7 @@ async function sendReleaseNotification(repo, release) {
   
   const typeInfo = getNotificationTypeInfo(isTag ? 'tag' : 'release');
   const timeStr = formatTime();
+  const platformName = platform === 'gitlab' ? 'GitLab' : 'GitHub';
   
   // Build detailed message
   let detailedMessage = `${releaseName}`;
@@ -1125,20 +1666,20 @@ async function sendReleaseNotification(repo, release) {
   console.log(`[Commit Watch] Creating notification: ${repo.name} - ${releaseName}`);
   
   try {
-    await chrome.notifications.create(notificationId, {
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: `${typeInfo.emoji} ${repo.full_name}`,
-      message: detailedMessage,
+    await createUnifiedNotification({
+      id: notificationId,
+      platformName,
+      repoName: repo.full_name,
+      title: releaseName,
+      message: (isPrerelease ? '(Pre-release)\n' : '') + `Version: ${tagName}` + (authorName !== 'Unknown' ? ` by ${authorName}` : ''),
       contextMessage: `${timeStr} · ${isPrerelease ? 'Pre-release' : 'Stable'}`,
-      priority: 2,
-      requireInteraction: true,
       buttons: [
         { title: `View ${isTag ? 'Tag' : 'Release'}` },
         { title: 'Dismiss' }
-      ]
+      ],
+      priority: 2,
+      requireInteraction: true
     });
-    
     console.log(`[Commit Watch] ✅ Notification created successfully: ${notificationId}`);
   } catch (error) {
     console.error(`[Commit Watch] ❌ Failed to create notification:`, error);
@@ -1148,6 +1689,7 @@ async function sendReleaseNotification(repo, release) {
   await storeNotificationHistory({
     id: notificationId,
     type: isTag ? 'tag' : 'release',
+    platform: repo.platform || 'github',
     repo: repo.full_name,
     tagName,
     releaseName,
@@ -1293,8 +1835,10 @@ async function sendCommitNotification(repo, commit, priority) {
   };
   const config = priorityConfig[priority];
   
-  const notificationId = `commit-${repo.full_name}-${shortSha}`;
+  const platform = repo.platform || 'github';
+  const notificationId = `${platform}-commit-${repo.full_name}-${shortSha}`;
   const timeStr = formatTime();
+  const platformName = platform === 'gitlab' ? 'GitLab' : 'GitHub';
   
   // Build clean message
   let detailedMessage = `${authorName}: ${title}`;
@@ -1302,25 +1846,27 @@ async function sendCommitNotification(repo, commit, priority) {
     detailedMessage += `\n${statsText}`;
   }
   
-  await chrome.notifications.create(notificationId, {
-    type: 'basic',
-    iconUrl: 'icons/icon128.png',
-    title: `${typeInfo.emoji} ${repo.full_name}`,
-    message: detailedMessage,
+  await createUnifiedNotification({
+    id: notificationId,
+    platformName,
+    repoName: repo.full_name,
+    title: detailedMessage,
+    message: description,
     contextMessage: `${timeStr} · ${typeInfo.label} · ${shortSha}`,
-    priority: priority === 'high' ? 2 : (priority === 'medium' ? 1 : 0),
-    requireInteraction: priority === 'high',
-    silent: priority === 'low',
     buttons: [
       { title: 'View Commit' },
       { title: 'Mark as Read' }
-    ]
+    ],
+    priority: priority === 'high' ? 2 : (priority === 'medium' ? 1 : 0),
+    requireInteraction: priority === 'high',
+    silent: priority === 'low'
   });
   
   await storeNotificationHistory({
     id: notificationId,
     type: 'commit',
     commitType,
+    platform: repo.platform || 'github',
     repo: repo.full_name,
     author: authorName,
     message: title,
@@ -1348,23 +1894,24 @@ async function sendGitHubNotification(notification) {
   let detailedMessage = `${notification.subject.title}`;
   detailedMessage += `\n${reasonText}`;
   
-  await chrome.notifications.create(notificationId, {
-    type: 'basic',
-    iconUrl: 'icons/icon128.png',
-    title: `${typeInfo.emoji} ${notification.repository.full_name}`,
-    message: detailedMessage,
+  await createUnifiedNotification({
+    id: notificationId,
+    platformName: 'GitHub',
+    repoName: notification.repository.full_name,
+    title: detailedMessage,
     contextMessage: `${timeStr} · ${typeInfo.label}`,
-    priority: notification.reason === 'security_alert' ? 2 : 1,
-    requireInteraction: notification.reason === 'review_requested' || notification.reason === 'security_alert',
     buttons: [
       { title: 'View on GitHub' },
       { title: 'Mark as Read' }
-    ]
+    ],
+    priority: notification.reason === 'security_alert' ? 2 : 1,
+    requireInteraction: notification.reason === 'review_requested' || notification.reason === 'security_alert'
   });
   
   await storeNotificationHistory({
     id: notificationId,
     type: 'github',
+    platform: 'github',
     subType: notification.subject.type,
     reason: notification.reason,
     repo: notification.repository.full_name,
@@ -1389,9 +1936,11 @@ chrome.notifications.onClicked.addListener(async (notificationId) => {
   
   if (notification && notification.url) {
     chrome.tabs.create({ url: notification.url });
-  } else if (notificationId.startsWith('github-')) {
-    // Open GitHub notifications page
-    chrome.tabs.create({ url: 'https://github.com/notifications' });
+  } else if (notificationId.startsWith('github-') || notificationId.includes('-commit-') || notificationId.includes('-release-')) {
+    // Determine platform from notification ID
+    const isGitLab = notificationId.startsWith('gitlab-');
+    const baseUrl = isGitLab ? 'https://gitlab.com' : 'https://github.com/notifications';
+    chrome.tabs.create({ url: baseUrl });
   }
   
   // Clear the notification
@@ -1409,8 +1958,11 @@ chrome.notifications.onButtonClicked.addListener(async (notificationId, buttonIn
     // First button: View/Open
     if (notification && notification.url) {
       chrome.tabs.create({ url: notification.url });
-    } else if (notificationId.startsWith('github-')) {
-      chrome.tabs.create({ url: 'https://github.com/notifications' });
+    } else if (notificationId.startsWith('github-') || notificationId.includes('-commit-') || notificationId.includes('-release-')) {
+      // Determine platform from notification ID
+      const isGitLab = notificationId.startsWith('gitlab-');
+      const baseUrl = isGitLab ? 'https://gitlab.com' : 'https://github.com/notifications';
+      chrome.tabs.create({ url: baseUrl });
     }
   }
   
@@ -1485,15 +2037,16 @@ async function handleMessage(message) {
   try {
     switch (message.action) {
       case 'authenticate':
-        // Store the token provided by user (PAT method)
+      case 'authenticateGitHub':
+        // Store the GitHub token provided by user (PAT method)
         if (message.token) {
-          await setAccessToken(message.token);
+          await setGitHubAccessToken(message.token);
           
           // Fetch and store user data
           const response = await fetchGitHub('/user');
           if (!response.ok) {
-            await logout();
-            return { success: false, error: 'Invalid token' };
+            await setGitHubAccessToken(null);
+            return { success: false, error: 'Invalid GitHub token' };
           }
           
           const userData = await response.json();
@@ -1505,7 +2058,42 @@ async function handleMessage(message) {
           // Start polling
           await startPolling();
           
-          return { success: true, user: userData };
+          return { success: true, user: userData, platform: 'github' };
+        }
+        return { success: false, error: 'No token provided' };
+        
+      case 'authenticateGitLab':
+        // Store the GitLab token provided by user
+        if (message.token) {
+          await setGitLabAccessToken(message.token);
+          
+          // Fetch and store GitLab user data
+          const gitlabResponse = await fetchGitLab('/user');
+          if (!gitlabResponse.ok) {
+            await setGitLabAccessToken(null);
+            return { success: false, error: 'Invalid GitLab token' };
+          }
+          
+          const gitlabUser = await gitlabResponse.json();
+          // Normalize GitLab user to match GitHub format
+          const gitlabUserData = {
+            login: gitlabUser.username,
+            name: gitlabUser.name,
+            email: gitlabUser.email,
+            avatar_url: gitlabUser.avatar_url,
+            html_url: gitlabUser.web_url,
+            id: gitlabUser.id,
+            platform: 'gitlab'
+          };
+          await setStorage({ gitlabUserData });
+          
+          // Fetch initial GitLab projects
+          await fetchGitLabProjects();
+          
+          // Start polling if not already running
+          await startPolling();
+          
+          return { success: true, user: gitlabUserData, platform: 'gitlab' };
         }
         return { success: false, error: 'No token provided' };
         
@@ -1513,16 +2101,45 @@ async function handleMessage(message) {
         await logout();
         return { success: true };
         
+      case 'logoutGitHub':
+        await chrome.storage.local.remove(['githubToken', 'userData', 'repositories', 'lastCommits']);
+        // Check if GitLab is still connected, if not stop polling
+        if (!(await isGitLabAuthenticated())) {
+          await stopPolling();
+        }
+        return { success: true };
+        
+      case 'logoutGitLab':
+        await chrome.storage.local.remove(['gitlabToken', 'gitlabUserData', 'gitlabRepositories', 'gitlabLastCommits']);
+        // Check if GitHub is still connected, if not stop polling
+        if (!(await isGitHubAuthenticated())) {
+          await stopPolling();
+        }
+        return { success: true };
+        
       case 'getStatus':
-        const isAuth = await isAuthenticated();
-        const { userData, rateLimit, lastCheckTime, lastError } = await getStorage([
-          'userData', 'rateLimit', 'lastCheckTime', 'lastError'
+        const [isGitHubAuth, isGitLabAuth] = await Promise.all([
+          isGitHubAuthenticated(),
+          isGitLabAuthenticated()
+        ]);
+        const { 
+          userData, gitlabUserData, 
+          rateLimit, gitlabRateLimit: storedGitlabRateLimit,
+          lastCheckTime, lastError 
+        } = await getStorage([
+          'userData', 'gitlabUserData', 
+          'rateLimit', 'gitlabRateLimit',
+          'lastCheckTime', 'lastError'
         ]);
         
         return {
-          authenticated: isAuth,
+          authenticated: isGitHubAuth || isGitLabAuth,
+          githubAuthenticated: isGitHubAuth,
+          gitlabAuthenticated: isGitLabAuth,
           user: userData,
+          gitlabUser: gitlabUserData,
           rateLimit,
+          gitlabRateLimit: storedGitlabRateLimit,
           lastCheckTime,
           lastError
         };
@@ -1534,7 +2151,10 @@ async function handleMessage(message) {
       case 'checkNow':
         await checkAllRepositoriesForCommits();
         await checkAllRepositoriesForReleases();
-        await checkGitHubNotifications();
+        // Only check GitHub notifications if authenticated to GitHub
+        if (await isGitHubAuthenticated()) {
+          await checkGitHubNotifications();
+        }
         return { success: true };
         
       case 'getNotificationHistory':
@@ -1560,6 +2180,12 @@ async function handleMessage(message) {
         
       case 'clearBadge':
         await clearUnreadCount();
+        return { success: true };
+      
+      case 'clearNotificationHistory':
+        // Clear all notification history (useful when platform data is outdated)
+        await setStorage({ notificationHistory: [] });
+        console.log('[Commit Watch] Notification history cleared');
         return { success: true };
       
       case 'resetReleaseCache':

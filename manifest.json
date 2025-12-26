@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Commit Watch",
-  "version": "1.1.0",
-  "description": "Intelligently monitors GitHub repositories and notifies you about important commits, releases, and activity with automatic file-based detection.",
+  "version": "2.0.0",
+  "description": "Intelligently monitors GitHub and GitLab repositories and notifies you about important commits, releases, and activity with automatic file-based detection.",
   
   "permissions": [
     "storage",
@@ -13,7 +13,9 @@
   
   "host_permissions": [
     "https://api.github.com/*",
-    "https://github.com/*"
+    "https://github.com/*",
+    "https://gitlab.com/api/v4/*",
+    "https://gitlab.com/*"
   ],
   
   "background": {

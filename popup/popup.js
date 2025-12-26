@@ -19,15 +19,31 @@ const elements = {
   loading: document.getElementById('loading'),
   errorMessage: document.getElementById('error-message'),
   
-  // Login elements
-  tokenInput: document.getElementById('token-input'),
-  showTokenBtn: document.getElementById('show-token-btn'),
-  loginBtn: document.getElementById('login-btn'),
+  // Platform tabs
+  platformTabs: document.querySelectorAll('.platform-tab'),
+  githubLogin: document.getElementById('github-login'),
+  gitlabLogin: document.getElementById('gitlab-login'),
+  
+  // GitHub login elements
+  githubTokenInput: document.getElementById('github-token-input'),
+  showGithubTokenBtn: document.getElementById('show-github-token-btn'),
+  githubLoginBtn: document.getElementById('github-login-btn'),
+  
+  // GitLab login elements
+  gitlabTokenInput: document.getElementById('gitlab-token-input'),
+  showGitlabTokenBtn: document.getElementById('show-gitlab-token-btn'),
+  gitlabLoginBtn: document.getElementById('gitlab-login-btn'),
+  
+  // Legacy elements (for backwards compatibility)
+  tokenInput: document.getElementById('github-token-input'),
+  showTokenBtn: document.getElementById('show-github-token-btn'),
+  loginBtn: document.getElementById('github-login-btn'),
   
   // Main view elements
   settingsBtn: document.getElementById('settings-btn'),
   themeToggleBtn: document.getElementById('theme-toggle-btn'),
   userAvatar: document.getElementById('user-avatar'),
+  gitlabUserAvatar: document.getElementById('gitlab-user-avatar'),
   userName: document.getElementById('user-name'),
   logoutBtn: document.getElementById('logout-btn'),
   repoCount: document.getElementById('repo-count'),
@@ -196,11 +212,30 @@ async function updateMainView() {
       return;
     }
     
-    // Update user info
+    // Update user info - show connected platforms
+    const userNames = [];
+    
     if (status.user) {
       elements.userAvatar.src = status.user.avatar_url;
-      elements.userName.textContent = status.user.login;
+      elements.userAvatar.classList.remove('hidden');
+      elements.userAvatar.title = `GitHub: ${status.user.login}`;
+      userNames.push(status.user.login);
+    } else {
+      elements.userAvatar.classList.add('hidden');
     }
+    
+    if (status.gitlabUser) {
+      elements.gitlabUserAvatar.src = status.gitlabUser.avatar_url || '../icons/gitlab-default.png';
+      elements.gitlabUserAvatar.classList.remove('hidden');
+      elements.gitlabUserAvatar.title = `GitLab: ${status.gitlabUser.login}`;
+      if (!userNames.includes(status.gitlabUser.login)) {
+        userNames.push(status.gitlabUser.login);
+      }
+    } else {
+      elements.gitlabUserAvatar.classList.add('hidden');
+    }
+    
+    elements.userName.textContent = userNames.join(' / ');
     
     // Get repositories
     const repoResponse = await sendMessage({ action: 'getRepositories' });
@@ -249,6 +284,20 @@ async function updateActivityList() {
     
     // Build activity list HTML
     const activityHtml = response.history.slice(0, 10).map(item => {
+      // Platform badge - determine from stored platform or infer from URL
+      let platform = item.platform;
+      if (!platform) {
+        // Fallback: detect platform from URL
+        if (item.url && item.url.includes('gitlab.com')) {
+          platform = 'gitlab';
+        } else {
+          platform = 'github';
+        }
+      }
+      const platformBadge = platform === 'gitlab' 
+        ? '<span class="platform-badge gitlab" title="GitLab">GitLab</span>'
+        : '<span class="platform-badge github" title="GitHub">GitHub</span>';
+      
       // Handle different notification types
       if (item.type === 'release') {
         // Release/Tag notification
@@ -259,7 +308,8 @@ async function updateActivityList() {
         return `
           <a href="${item.url}" target="_blank" class="activity-item release-item">
             <div class="activity-header">
-              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              ${platformBadge}
+              <span class="activity-repo">${truncate(item.repo, 22)}</span>
               <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
             </div>
             <div class="activity-message">
@@ -281,7 +331,8 @@ async function updateActivityList() {
         return `
           <a href="${item.url}" target="_blank" class="activity-item ${priorityClass}">
             <div class="activity-header">
-              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              ${platformBadge}
+              <span class="activity-repo">${truncate(item.repo, 22)}</span>
               <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
             </div>
             <div class="activity-message">
@@ -296,7 +347,8 @@ async function updateActivityList() {
         return `
           <a href="${item.url}" target="_blank" class="activity-item">
             <div class="activity-header">
-              <span class="activity-repo">${truncate(item.repo, 25)}</span>
+              ${platformBadge}
+              <span class="activity-repo">${truncate(item.repo, 22)}</span>
               <span class="activity-time">${formatRelativeTime(item.timestamp)}</span>
             </div>
             <div class="activity-message">
@@ -319,10 +371,10 @@ async function updateActivityList() {
 // =============================================================================
 
 /**
- * Handle login button click
+ * Handle GitHub login button click
  */
-async function handleLogin() {
-  const token = elements.tokenInput.value.trim();
+async function handleGitHubLogin() {
+  const token = elements.githubTokenInput.value.trim();
   
   if (!token) {
     showError('Please enter a token');
@@ -335,27 +387,75 @@ async function handleLogin() {
     return;
   }
   
-  elements.loginBtn.disabled = true;
-  elements.loginBtn.innerHTML = '<span>Connecting...</span>';
+  elements.githubLoginBtn.disabled = true;
+  elements.githubLoginBtn.innerHTML = '<span>Connecting...</span>';
   
   try {
     const response = await sendMessage({
-      action: 'authenticate',
+      action: 'authenticateGitHub',
       token: token
     });
     
     if (response.success) {
-      elements.tokenInput.value = ''; // Clear token from input
+      elements.githubTokenInput.value = ''; // Clear token from input
       await updateMainView();
     } else {
-      showError(response.error || 'Authentication failed');
+      showError(response.error || 'GitHub authentication failed');
     }
   } catch (error) {
     showError('Connection failed. Please try again.');
   } finally {
-    elements.loginBtn.disabled = false;
-    elements.loginBtn.innerHTML = '<span>Connect</span>';
+    elements.githubLoginBtn.disabled = false;
+    elements.githubLoginBtn.innerHTML = '<span>Connect to GitHub</span>';
   }
+}
+
+/**
+ * Handle GitLab login button click
+ */
+async function handleGitLabLogin() {
+  const token = elements.gitlabTokenInput.value.trim();
+  
+  if (!token) {
+    showError('Please enter a token');
+    return;
+  }
+  
+  // GitLab tokens are typically 20+ chars, but don't enforce glpat- prefix
+  // as self-hosted instances may have different formats
+  if (token.length < 20) {
+    showError('Token seems too short. Please enter a valid GitLab Personal Access Token.');
+    return;
+  }
+  
+  elements.gitlabLoginBtn.disabled = true;
+  elements.gitlabLoginBtn.innerHTML = '<span>Connecting...</span>';
+  
+  try {
+    const response = await sendMessage({
+      action: 'authenticateGitLab',
+      token: token
+    });
+    
+    if (response.success) {
+      elements.gitlabTokenInput.value = ''; // Clear token from input
+      await updateMainView();
+    } else {
+      showError(response.error || 'GitLab authentication failed');
+    }
+  } catch (error) {
+    showError('Connection failed. Please try again.');
+  } finally {
+    elements.gitlabLoginBtn.disabled = false;
+    elements.gitlabLoginBtn.innerHTML = '<span>Connect to GitLab</span>';
+  }
+}
+
+/**
+ * Handle login button click (legacy - routes to GitHub)
+ */
+async function handleLogin() {
+  return handleGitHubLogin();
 }
 
 /**
@@ -401,15 +501,16 @@ async function handleCheckNow() {
 }
 
 /**
- * Handle show/hide token button click
+ * Handle show/hide token button click for a specific input
+ * @param {HTMLInputElement} input - The token input element
+ * @param {HTMLButtonElement} btn - The toggle button element
  */
-function handleToggleToken() {
-  const input = elements.tokenInput;
+function handleToggleTokenFor(input, btn) {
   const isPassword = input.type === 'password';
   input.type = isPassword ? 'text' : 'password';
   
   // Update button icon
-  elements.showTokenBtn.innerHTML = isPassword
+  btn.innerHTML = isPassword
     ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
          <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24"/>
          <line x1="1" y1="1" x2="23" y2="23"/>
@@ -418,6 +519,37 @@ function handleToggleToken() {
          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
          <circle cx="12" cy="12" r="3"/>
        </svg>`;
+}
+
+/**
+ * Handle show/hide token button click
+ */
+function handleToggleToken() {
+  handleToggleTokenFor(elements.githubTokenInput, elements.showGithubTokenBtn);
+}
+
+/**
+ * Switch between platform login tabs
+ * @param {string} platform - 'github' or 'gitlab'
+ */
+function switchPlatformTab(platform) {
+  // Update tab states
+  elements.platformTabs.forEach(tab => {
+    if (tab.dataset.platform === platform) {
+      tab.classList.add('active');
+    } else {
+      tab.classList.remove('active');
+    }
+  });
+  
+  // Show/hide login forms
+  if (platform === 'github') {
+    elements.githubLogin.classList.remove('hidden');
+    elements.gitlabLogin.classList.add('hidden');
+  } else {
+    elements.githubLogin.classList.add('hidden');
+    elements.gitlabLogin.classList.remove('hidden');
+  }
 }
 
 /**
@@ -443,12 +575,30 @@ async function init() {
   
   showView('loading');
   
-  // Set up event listeners
-  elements.loginBtn.addEventListener('click', handleLogin);
-  elements.tokenInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') handleLogin();
+  // Set up platform tab event listeners
+  elements.platformTabs.forEach(tab => {
+    tab.addEventListener('click', () => switchPlatformTab(tab.dataset.platform));
   });
-  elements.showTokenBtn.addEventListener('click', handleToggleToken);
+  
+  // Set up GitHub login event listeners
+  elements.githubLoginBtn.addEventListener('click', handleGitHubLogin);
+  elements.githubTokenInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleGitHubLogin();
+  });
+  elements.showGithubTokenBtn.addEventListener('click', () => {
+    handleToggleTokenFor(elements.githubTokenInput, elements.showGithubTokenBtn);
+  });
+  
+  // Set up GitLab login event listeners
+  elements.gitlabLoginBtn.addEventListener('click', handleGitLabLogin);
+  elements.gitlabTokenInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleGitLabLogin();
+  });
+  elements.showGitlabTokenBtn.addEventListener('click', () => {
+    handleToggleTokenFor(elements.gitlabTokenInput, elements.showGitlabTokenBtn);
+  });
+  
+  // Set up main view event listeners
   elements.logoutBtn.addEventListener('click', handleLogout);
   elements.checkNowBtn.addEventListener('click', handleCheckNow);
   elements.settingsBtn.addEventListener('click', handleOpenSettings);
