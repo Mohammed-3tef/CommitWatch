@@ -1,6 +1,5 @@
 # Commit Watch
 
-**Version 2.0.0** - Now with GitLab Support, Enhanced Intelligent Commit Analysis & Release Monitoring
 
 A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab** repositories and notifies you about important commits, releases, and activity with **automatic file-based detection**.
 
@@ -169,16 +168,16 @@ CommitWatch/
 
 ### Architecture Overview
 ```
-┌─────────────────────────────────────────────────┐
-│          Background Service Worker              │
-├─────────────────────────────────────────────────┤
-│  • Periodic polling (chrome.alarms)            │
-│  • GitHub & GitLab API integration              │
-│  • Intelligent commit analysis                  │
-│  • Release/tag monitoring (GitHub & GitLab)     │
-│  • Notification management (platform-aware)     │
-│  • Rate limit tracking (GitHub & GitLab)        │
-└─────────────────────────────────────────────────┘
+  ┌─────────────────────────────────────────────────┐
+  │          Background Service Worker              │
+  ├─────────────────────────────────────────────────┤
+  │  • Periodic polling (chrome.alarms)             │
+  │  • GitHub & GitLab API integration              │
+  │  • Intelligent commit analysis                  │
+  │  • Release/tag monitoring (GitHub & GitLab)     │
+  │  • Notification management (platform-aware)     │
+  │  • Rate limit tracking (GitHub & GitLab)        │
+  └─────────────────────────────────────────────────┘
               ↓          ↓          ↓
     ┌──────────────┬──────────────┬──────────────┐
     │   Popup UI   │  Options UI  │ Notifications│
@@ -235,29 +234,6 @@ Fetch Commit → Analyze Type → Detect Critical Files → Calculate Priority �
 - `chrome.identity` - OAuth authentication (optional)
 - `chrome.runtime` - Message passing between components
 - `chrome.action` - Badge management
-
-### File Pattern Detection
-Edit patterns in `analyzeCommitType()`:
-```javascript
-const filePatterns = {
-  docs: [/\.md$/i, /^docs\//i, ...],
-  config: [/package\.json$/i, /tsconfig\.json$/i, ...],
-  ci: [/^\.github\/workflows\//i, /^Dockerfile$/i, ...],
-  tests: [/\.(test|spec)\.(js|ts)$/i, ...],
-  localization: [/^locales?\//i, /^i18n\//i, ...]
-};
-```
-
-### Critical File Detection
-Edit patterns in `analyzeCriticalFiles()`:
-```javascript
-const criticalPatterns = [
-  { pattern: /auth/i, category: 'security', weight: 3 },
-  { pattern: /security/i, category: 'security', weight: 3 },
-  { pattern: /migration/i, category: 'database', weight: 2 },
-  // Add your own patterns
-];
-```
 
 ## ⚠️ Troubleshooting
 

@@ -55,7 +55,8 @@ const elements = {
   checkNowBtn: document.getElementById('check-now-btn'),
   lastCheckTime: document.getElementById('last-check-time'),
   activityList: document.getElementById('activity-list'),
-  filterButtons: document.querySelectorAll('.filter-btn')
+  filterButtons: document.querySelectorAll('.filter-btn'),
+  clearActivityBtn: document.getElementById('clear-activity-btn')
 };
 
 // =============================================================================
@@ -602,6 +603,31 @@ async function handleCheckNow() {
 }
 
 /**
+ * Handle clear activity button click
+ */
+async function handleClearActivity() {
+  if (!confirm('Are you sure you want to clear all activity? This action cannot be undone.')) {
+    return;
+  }
+  
+  try {
+    // Clear notification history in background
+    await sendMessage({ action: 'clearNotificationHistory' });
+    
+    // Clear local activity data
+    activityData = [];
+    
+    // Update the UI
+    elements.activityList.innerHTML = '<p class="empty-state">No recent commits</p>';
+    elements.commitCount.textContent = '0';
+    
+  } catch (error) {
+    showError('Failed to clear activity');
+    console.error('Error clearing activity:', error);
+  }
+}
+
+/**
  * Handle show/hide token button click for a specific input
  * @param {HTMLInputElement} input - The token input element
  * @param {HTMLButtonElement} btn - The toggle button element
@@ -702,6 +728,7 @@ async function init() {
   // Set up main view event listeners
   elements.logoutBtn.addEventListener('click', handleLogout);
   elements.checkNowBtn.addEventListener('click', handleCheckNow);
+  elements.clearActivityBtn.addEventListener('click', handleClearActivity);
   elements.settingsBtn.addEventListener('click', handleOpenSettings);
   elements.themeToggleBtn.addEventListener('click', toggleTheme);
   

@@ -112,7 +112,7 @@ body {
 }
 
 .options-container {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: var(--spacing-xl);
 }
@@ -919,6 +919,181 @@ input::placeholder {
 }
 
 /* =============================================================================
+   ANALYTICS SECTION
+   ============================================================================= */
+
+.analytics-section {
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-background) 100%);
+}
+
+.analytics-controls {
+  margin-bottom: var(--spacing-xl);
+}
+
+.time-range-selector {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  flex-wrap: wrap;
+}
+
+.time-range-selector label {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.time-range-selector select {
+  flex: 1;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 14px;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.time-range-selector select:hover {
+  border-color: var(--color-text-link);
+}
+
+.time-range-selector select:focus {
+  outline: none;
+  border-color: var(--color-text-link);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.charts-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(450px, 1fr));
+  gap: var(--spacing-xl);
+}
+
+.chart-wrapper {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-lg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all var(--transition-normal);
+}
+
+.chart-wrapper:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+  border-bottom: 2px solid var(--color-border);
+}
+
+.chart-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.chart-title svg {
+  flex-shrink: 0;
+}
+
+.chart-title h3 {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.chart-title.gitlab svg {
+  color: #fc6d26;
+}
+
+.chart-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.chart-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.chart-stats .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.chart-stats .stat-label {
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+}
+
+.chart-stats .stat-sublabel {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+.chart-canvas-wrapper {
+  position: relative;
+  min-height: 300px;
+}
+
+.chart-canvas-wrapper canvas {
+  max-height: 350px;
+}
+
+.chart-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xxl);
+  text-align: center;
+  color: var(--color-text-muted);
+  min-height: 300px;
+}
+
+.chart-empty-state svg {
+  opacity: 0.3;
+}
+
+.chart-empty-state p {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.chart-empty-state span {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* =============================================================================
    RESPONSIVE STYLES
    ============================================================================= */
 
@@ -949,6 +1124,14 @@ input::placeholder {
   
   .section-title {
     font-size: 14px;
+  }
+  
+  .charts-container {
+    grid-template-columns: 1fr;
+  }
+  
+  .time-range-selector {
+    max-width: 100%;
   }
   
   .form-group {

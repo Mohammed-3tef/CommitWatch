@@ -556,6 +556,12 @@ footer a:hover {
   margin-bottom: var(--spacing-sm);
 }
 
+.activity-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .platform-filter {
   display: flex;
   gap: var(--spacing-xs);
