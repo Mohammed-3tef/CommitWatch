@@ -64,7 +64,7 @@ export async function getGitHubRepositories() {
   const { repositories, repositoriesUpdated } = await getStorage(['repositories', 'repositoriesUpdated']);
   
   // Refresh if cache is older than 1 hour
-  if (!repositories || Date.now() - repositoriesUpdated > 60 * 60 * 1000) {
+  if (!repositories || !repositoriesUpdated || Date.now() - repositoriesUpdated > 60 * 60 * 1000) {
     return fetchUserRepositories();
   }
   
@@ -80,7 +80,7 @@ export async function getGitLabRepositories() {
   const { gitlabRepositories, gitlabRepositoriesUpdated } = await getStorage(['gitlabRepositories', 'gitlabRepositoriesUpdated']);
   
   // Refresh if cache is older than 1 hour
-  if (!gitlabRepositories || Date.now() - gitlabRepositoriesUpdated > 60 * 60 * 1000) {
+  if (!gitlabRepositories || !gitlabRepositoriesUpdated || Date.now() - gitlabRepositoriesUpdated > 60 * 60 * 1000) {
     return fetchGitLabProjects();
   }
   

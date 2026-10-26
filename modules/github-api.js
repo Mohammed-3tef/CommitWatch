@@ -2,9 +2,8 @@
  * Commit Watch - GitHub API Utilities
  */
 
-import { GITHUB_API_BASE } from './support.js';
-import { getAccessToken, getGitHubAccessToken } from './auth.js';
-import { getStorage, setStorage } from './support.js';
+import { GITHUB_API_BASE, getStorage, setStorage } from './support.js';
+import { getAccessToken } from './auth.js';
 
 /**
  * Rate limit tracking
@@ -16,18 +15,18 @@ let rateLimitReset = null;
 /**
  * Make authenticated request to GitHub API
  * Handles rate limiting and caching
- * 
+ *
  * @param {string} endpoint - API endpoint (e.g., '/user/repos')
  * @param {Object} options - Fetch options
  * @returns {Promise<Response>}
  */
 export async function fetchGitHub(endpoint, options = {}) {
   const token = await getAccessToken();
-  
+
   if (!token) {
     throw new Error('Not authenticated');
   }
-  
+
   // Check rate limit before making request
   if (rateLimitRemaining <= 10 && rateLimitReset) {
     const now = Date.now() / 1000;
@@ -36,9 +35,9 @@ export async function fetchGitHub(endpoint, options = {}) {
       throw new Error(`Rate limit exceeded. Resets in ${waitTime} minutes.`);
     }
   }
-  
+
   const url = endpoint.startsWith('http') ? endpoint : `${GITHUB_API_BASE}${endpoint}`;
-  
+
   const response = await fetch(url, {
     ...options,
     headers: {
@@ -48,11 +47,11 @@ export async function fetchGitHub(endpoint, options = {}) {
       ...options.headers
     }
   });
-  
+
   // Update rate limit tracking from response headers
   rateLimitRemaining = parseInt(response.headers.get('X-RateLimit-Remaining') || '5000');
   rateLimitReset = parseInt(response.headers.get('X-RateLimit-Reset') || '0');
-  
+
   // Store rate limit info for display in popup
   await setStorage({
     rateLimit: {
@@ -61,7 +60,7 @@ export async function fetchGitHub(endpoint, options = {}) {
       limit: parseInt(response.headers.get('X-RateLimit-Limit') || '5000')
     }
   });
-  
+
   return response;
 }
 

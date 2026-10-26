@@ -160,7 +160,7 @@ export async function handleMessage(message) {
         await setStorage({ settings: newSettings });
         
         // Restart polling with new interval if changed
-        if (message.settings.checkInterval) {
+        if (Object.hasOwn(message.settings, 'checkInterval') && await isAuthenticated()) {
           await stopPolling();
           await startPolling();
         }
