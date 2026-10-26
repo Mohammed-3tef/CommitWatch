@@ -19,6 +19,7 @@ import { checkAllRepositoriesForCommits } from './commit-monitoring.js';
 import { checkAllRepositoriesForReleases } from './release-monitoring.js';
 import { checkGitHubNotifications } from './notifications.js';
 import { startPolling, stopPolling } from './runtime.js';
+import { backfillRepositoryHistory } from './activity-backfill.js';
 
 /**
  * Async message handler
@@ -153,6 +154,15 @@ export async function handleMessage(message) {
       case 'getNotificationHistory':
         const { notificationHistory = [] } = await getStorage('notificationHistory');
         return { success: true, history: notificationHistory };
+
+      case 'backfillRepositoryHistory':
+        if (!message.repository || !message.days) {
+          return { success: false, error: 'Repository and backfill period are required' };
+        }
+        return {
+          success: true,
+          result: await backfillRepositoryHistory(message.repository, Number(message.days))
+        };
         
       case 'updateSettings':
         const currentSettings = await getSettings();

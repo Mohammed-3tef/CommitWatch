@@ -78,7 +78,8 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 - **File pattern recognition** - Automatically identifies docs, config, CI/CD, tests
 - **Critical file detection** - Recognizes security, auth, core system files
 - **Change size analysis** - Detects large refactors and breaking changes
-- **Notification history** - Stores last 100 notifications with full details
+- **Notification history** - Stores the last 1,000 notifications with full details
+- **Activity history backfill** - Silently imports the last 7, 30, or 90 days of default-branch commits into the Activity Dashboard
 - **Badge counter** - Shows unread count on extension icon
 
 ## 📦 Installation
@@ -141,6 +142,7 @@ Create a new token at [gitlab.com/-/profile/personal_access_tokens](https://gitl
 | Ignore Forks | Don't monitor forked repositories | ✅ On |
 | Ignore Own Commits | Don't notify for your commits | ❌ Off |
 | Per-Repo Toggle | Enable/disable individual repositories | All enabled |
+| Backfill History | Silently import recent default-branch activity into the Activity Dashboard | Do not backfill |
 
 ## 📁 Project Structure
 

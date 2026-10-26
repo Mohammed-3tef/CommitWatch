@@ -55,6 +55,7 @@ const elements = {
   activityType: document.getElementById('activity-type'),
   activityPriority: document.getElementById('activity-priority'),
   activityDate: document.getElementById('activity-date'),
+  activitySort: document.getElementById('activity-sort'),
   activityBranch: document.getElementById('activity-branch'),
   activityAuthor: document.getElementById('activity-author'),
   refreshActivityBtn: document.getElementById('refresh-activity-btn'),
@@ -179,6 +180,29 @@ function escapeHtml(value) {
   }[character]));
 }
 
+function compareActivityItems(left, right, sort) {
+  const leftTitle = getActivityTitle(left).toLowerCase();
+  const rightTitle = getActivityTitle(right).toLowerCase();
+  const leftRepo = String(left.repo || '').toLowerCase();
+  const rightRepo = String(right.repo || '').toLowerCase();
+  const priorityRank = { high: 0, medium: 1, low: 2 };
+
+  switch (sort) {
+    case 'oldest':
+      return (left.timestamp || 0) - (right.timestamp || 0);
+    case 'title-asc':
+      return leftTitle.localeCompare(rightTitle);
+    case 'repository-asc':
+      return leftRepo.localeCompare(rightRepo) || (right.timestamp || 0) - (left.timestamp || 0);
+    case 'priority':
+      return (priorityRank[left.priority] ?? 1) - (priorityRank[right.priority] ?? 1) ||
+        (right.timestamp || 0) - (left.timestamp || 0);
+    case 'newest':
+    default:
+      return (right.timestamp || 0) - (left.timestamp || 0);
+  }
+}
+
 function getFilteredActivity() {
   const query = elements.activitySearch.value.trim().toLowerCase();
   const repository = elements.activityRepository.value;
@@ -189,7 +213,7 @@ function getFilteredActivity() {
   const days = elements.activityDate.value === 'all' ? null : Number(elements.activityDate.value);
   const since = days ? Date.now() - days * 24 * 60 * 60 * 1000 : 0;
 
-  return activityHistory.filter(item => {
+  const filtered = activityHistory.filter(item => {
     const itemType = getActivityType(item);
     return (!query || getActivitySearchText(item).includes(query)) &&
       (currentActivityPlatform === 'all' || (item.platform || 'github') === currentActivityPlatform) &&
@@ -200,6 +224,9 @@ function getFilteredActivity() {
       (!author || String(item.author || '').toLowerCase().includes(author)) &&
       (!since || (item.timestamp || 0) >= since);
   });
+  return filtered.sort((left, right) =>
+    compareActivityItems(left, right, elements.activitySort.value)
+  );
 }
 
 function renderActivityHistory() {
@@ -1687,6 +1714,20 @@ async function renderRepositories(repos) {
             <span class="repo-branch">${repo.default_branch}</span>
           </div>
         </div>
+        <div class="repo-backfill">
+          <label>
+            <span class="repo-backfill-label">Backfill history</span>
+            <select class="repo-backfill-select" data-repo="${repoKey}" aria-label="Backfill recent history">
+              <option value="none">Do not backfill</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </label>
+          <button type="button" class="btn btn-secondary btn-small repo-backfill-btn" data-repo="${repoKey}">
+            Import
+          </button>
+        </div>
         <label class="toggle">
           <input type="checkbox" class="repo-toggle" data-repo="${repoKey}" ${isEnabled ? 'checked' : ''} />
           <span class="toggle-slider"></span>
@@ -1700,6 +1741,9 @@ async function renderRepositories(repos) {
   // Add event listeners to toggles
   document.querySelectorAll('.repo-toggle').forEach(toggle => {
     toggle.addEventListener('change', handleRepoToggle);
+  });
+  document.querySelectorAll('.repo-backfill-btn').forEach(button => {
+    button.addEventListener('click', handleRepoBackfill);
   });
 }
 
@@ -1744,6 +1788,14 @@ async function handleRepoToggle(event) {
       action: 'updateSettings',
       settings: { enabledRepos }
     });
+
+    if (isEnabled) {
+      const row = event.target.closest('.repo-item');
+      const period = row?.querySelector('.repo-backfill-select')?.value;
+      if (period && period !== 'none') {
+        await backfillRepository(row.dataset.repo, period, row);
+      }
+    }
     
   } catch (error) {
     console.error('Failed to update repo setting:', error);
@@ -1751,6 +1803,59 @@ async function handleRepoToggle(event) {
     event.target.checked = !isEnabled;
     showToast('Failed to save', 'error');
   }
+}
+
+async function backfillRepository(repoKey, period, row) {
+  const repo = allRepositories.find(item =>
+    `${item.platform || 'github'}:${item.full_name}` === repoKey
+  );
+  if (!repo) {
+    showToast('Repository is no longer available', 'error');
+    return;
+  }
+
+  const button = row?.querySelector('.repo-backfill-btn');
+  if (button) {
+    button.disabled = true;
+    button.textContent = 'Importing...';
+  }
+
+  try {
+    const response = await sendMessage({
+      action: 'backfillRepositoryHistory',
+      repository: repo,
+      days: Number(period)
+    });
+    if (!response.success) {
+      throw new Error(response.error || 'Backfill failed');
+    }
+    await loadActivityHistory();
+    showToast(
+      response.result.imported
+        ? `Imported ${response.result.imported} activity item(s)`
+        : 'No new activity found in that period',
+      'success'
+    );
+  } catch (error) {
+    console.error('Failed to backfill repository history:', error);
+    showToast(error.message || 'Failed to import history', 'error');
+  } finally {
+    if (button) {
+      button.disabled = false;
+      button.textContent = 'Import';
+    }
+  }
+}
+
+async function handleRepoBackfill(event) {
+  const button = event.currentTarget;
+  const row = button.closest('.repo-item');
+  const period = row?.querySelector('.repo-backfill-select')?.value;
+  if (!period || period === 'none') {
+    showToast('Choose a backfill period first', 'error');
+    return;
+  }
+  await backfillRepository(button.dataset.repo, period, row);
 }
 
 /**
@@ -1973,6 +2078,7 @@ function initEventListeners() {
   elements.activityType.addEventListener('change', renderActivityHistory);
   elements.activityPriority.addEventListener('change', renderActivityHistory);
   elements.activityDate.addEventListener('change', renderActivityHistory);
+  elements.activitySort.addEventListener('change', renderActivityHistory);
   elements.refreshActivityBtn.addEventListener('click', loadActivityHistory);
   elements.exportActivityJsonBtn.addEventListener('click', exportActivityJson);
   elements.exportActivityCsvBtn.addEventListener('click', exportActivityCsv);
