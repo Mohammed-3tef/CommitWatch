@@ -2,8 +2,7 @@
  * Commit Watch - Message Handler
  */
 
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
+import { getStorage, setStorage, getSettings, clearUnreadCount } from './support.js';
 import { 
   setGitHubAccessToken, 
   setGitLabAccessToken, 
@@ -19,8 +18,7 @@ import { getRepositories } from './repositories.js';
 import { checkAllRepositoriesForCommits } from './commit-monitoring.js';
 import { checkAllRepositoriesForReleases } from './release-monitoring.js';
 import { checkGitHubNotifications } from './notifications.js';
-import { clearUnreadCount } from './badge.js';
-import { startPolling, stopPolling } from './polling.js';
+import { startPolling, stopPolling } from './runtime.js';
 
 /**
  * Async message handler

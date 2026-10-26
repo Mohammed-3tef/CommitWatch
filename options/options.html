@@ -426,7 +426,7 @@
         <div class="priority-info">
           <div class="priority-item priority-high">
             <span class="priority-badge">🔴 High</span>
-            <p>Commits with: fix, hotfix, breaking, critical, urgent, security</p>
+            <p>Commits with: <span id="high-priority-keywords"></span></p>
             <p>Commits to main/master by repository owner</p>
           </div>
           <div class="priority-item priority-medium">
@@ -435,7 +435,7 @@
           </div>
           <div class="priority-item priority-low">
             <span class="priority-badge">🟢 Low</span>
-            <p>Merge commits, docs, documentation, format, style, chore</p>
+            <p>Merge commits and keywords: <span id="low-priority-keywords"></span></p>
           </div>
         </div>
       </section>
@@ -543,6 +543,6 @@
   </div>
 
   <script src="lib/chart.umd.min.js"></script>
-  <script src="options.js"></script>
+  <script type="module" src="options.js"></script>
 </body>
 </html>

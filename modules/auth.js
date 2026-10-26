@@ -2,8 +2,8 @@
  * Commit Watch - Authentication
  */
 
-import { getStorage, setStorage } from './storage.js';
-import { stopPolling } from './polling.js';
+import { getStorage, setStorage } from './support.js';
+import { stopPolling } from './runtime.js';
 
 /**
  * Get stored GitHub access token

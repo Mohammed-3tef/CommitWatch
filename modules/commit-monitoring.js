@@ -4,9 +4,7 @@
 
 import { fetchGitHub } from './github-api.js';
 import { fetchGitLab } from './gitlab-api.js';
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
-import { incrementUnreadCount } from './badge.js';
+import { getStorage, setStorage, getSettings, incrementUnreadCount } from './support.js';
 import { classifyCommitPriority, analyzeCommitType } from './commit-analysis.js';
 import { sendCommitNotification } from './notifications.js';
 import { getRepositories } from './repositories.js';
@@ -18,7 +16,7 @@ import { getRepositories } from './repositories.js';
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit with files or null
  */
-export async function fetchLatestGitHubCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
+export async function fetchLatestGitHubCommit(repo, lastKnownSha = null, branch = repo.default_branch || 'main') {
   try {
     // First get the latest commit SHA (lightweight request)
     const listResponse = await fetchGitHub(
@@ -69,7 +67,7 @@ export async function fetchLatestGitHubCommit(repo, lastKnownSha = null, branch 
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit normalized to GitHub format or null
  */
-export async function fetchLatestGitLabCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
+export async function fetchLatestGitLabCommit(repo, lastKnownSha = null, branch = repo.default_branch || 'main') {
   try {
     const projectId = encodeURIComponent(repo.full_name);
     
@@ -157,7 +155,7 @@ export async function fetchLatestGitLabCommit(repo, lastKnownSha = null, branch 
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit with files or null
  */
-export async function fetchLatestCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
+export async function fetchLatestCommit(repo, lastKnownSha = null, branch = repo.default_branch || 'main') {
   if (repo.platform === 'gitlab') {
     return fetchLatestGitLabCommit(repo, lastKnownSha, branch);
   }
@@ -209,6 +207,25 @@ async function fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey) {
   })).then(results => results.filter(Boolean));
 }
 
+function getDefaultBranchCandidates(repo) {
+  if (repo.default_branch) {
+    return [repo.default_branch];
+  }
+
+  return ['main', 'Main', 'master', 'Master'];
+}
+
+async function fetchLatestDefaultCommit(repo, lastKnownSha) {
+  for (const branch of getDefaultBranchCandidates(repo)) {
+    const commit = await fetchLatestCommit(repo, lastKnownSha, branch);
+    if (commit) {
+      return commit;
+    }
+  }
+
+  return null;
+}
+
 /**
  * Check a single repository for new commits
  * 
@@ -229,17 +246,23 @@ export async function checkRepoForNewCommits(repo, lastCommits, settings, userDa
   }
   
   const trackingAllBranches = settings.commitTrackingMode === 'all';
-  const commitsToCheck = trackingAllBranches
-    ? await fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey)
-    : [{
-        commit: await fetchLatestCommit(
-          repo,
-          lastCommits[repoKey] || lastCommits[repo.full_name],
-          repo.default_branch
-        ),
-        stateKey: repoKey
-      }];
+  let commitsToCheck;
+  try {
+    commitsToCheck = trackingAllBranches
+      ? await fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey)
+      : [{
+          commit: await fetchLatestDefaultCommit(
+            repo,
+            lastCommits[repoKey] || lastCommits[repo.full_name]
+          ),
+          stateKey: repoKey
+        }];
+  } catch (error) {
+    console.error(`Error checking branches for ${repo.full_name}:`, error);
+    return [];
+  }
   const results = [];
+  const notifiedShas = new Set();
 
   for (const entry of commitsToCheck) {
     const latestCommit = entry.commit;
@@ -271,10 +294,11 @@ export async function checkRepoForNewCommits(repo, lastCommits, settings, userDa
       results.push({
         repo,
         commit: latestCommit,
-        isNew: true,
+        isNew: !notifiedShas.has(latestCommit.sha),
         priority,
         repoKey: entry.stateKey
       });
+      notifiedShas.add(latestCommit.sha);
     }
   }
 

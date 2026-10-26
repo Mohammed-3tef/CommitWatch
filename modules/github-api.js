@@ -2,9 +2,9 @@
  * Commit Watch - GitHub API Utilities
  */
 
-import { GITHUB_API_BASE } from './constants.js';
+import { GITHUB_API_BASE } from './support.js';
 import { getAccessToken, getGitHubAccessToken } from './auth.js';
-import { getStorage, setStorage } from './storage.js';
+import { getStorage, setStorage } from './support.js';
 
 /**
  * Rate limit tracking

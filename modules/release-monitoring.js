@@ -4,9 +4,7 @@
 
 import { fetchGitHub } from './github-api.js';
 import { fetchGitLab } from './gitlab-api.js';
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
-import { incrementUnreadCount } from './badge.js';
+import { getStorage, setStorage, getSettings, incrementUnreadCount } from './support.js';
 import { sendReleaseNotification } from './notifications.js';
 import { getRepositories } from './repositories.js';
 

@@ -148,6 +148,18 @@ Create a new token at [gitlab.com/-/profile/personal_access_tokens](https://gitl
 CommitWatch/
 ├── manifest.json          # Extension manifest (v3)
 ├── background.js          # Service worker (polling, API, notifications, GitHub & GitLab)
+├── modules/
+│   ├── support.js         # Shared constants, storage, settings, badges, and UI helpers
+│   ├── runtime.js         # Polling, lifecycle, commands, and notification event wiring
+│   ├── auth.js            # GitHub and GitLab authentication
+│   ├── repositories.js    # Repository discovery and filtering
+│   ├── github-api.js      # GitHub API access
+│   ├── gitlab-api.js      # GitLab API access
+│   ├── commit-monitoring.js # Commit polling and branch tracking
+│   ├── release-monitoring.js # Release and tag polling
+│   ├── notifications.js   # Notification creation and history
+│   ├── commit-analysis.js # Commit type and priority analysis
+│   └── message-handler.js # Popup/options message routing
 ├── popup/
 │   ├── popup.html         # Popup UI markup
 │   ├── popup.js           # Popup interactions (with platform filter)
@@ -170,6 +182,15 @@ CommitWatch/
 
 ### Architecture Overview
 ```
+
+The background code is organized into three layers:
+
+- **Runtime layer** — [background.js](./background.js) and `modules/runtime.js` wire Chrome
+  lifecycle, alarms, commands, and notification events.
+- **Shared support layer** — `modules/support.js` contains low-level storage/settings,
+  constants, badge updates, and notification display helpers.
+- **Domain layer** — authentication, APIs, repositories, monitoring, analysis, and message
+  routing remain separate so feature logic stays discoverable.
   ┌─────────────────────────────────────────────────┐
   │          Background Service Worker              │
   ├─────────────────────────────────────────────────┤

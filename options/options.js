@@ -8,6 +8,8 @@
  * - Filter settings
  */
 
+import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from '../modules/support.js';
+
 // =============================================================================
 // DOM ELEMENTS
 // =============================================================================
@@ -69,6 +71,13 @@ const elements = {
   toast: document.getElementById('toast'),
   toastMessage: document.getElementById('toast-message')
 };
+
+function renderPriorityKeywords() {
+  document.getElementById('high-priority-keywords').textContent =
+    HIGH_PRIORITY_KEYWORDS.join(', ');
+  document.getElementById('low-priority-keywords').textContent =
+    LOW_PRIORITY_KEYWORDS.join(', ');
+}
 
 // Store repositories for filtering
 let allRepositories = [];
@@ -1750,6 +1759,7 @@ async function init() {
   await initTheme();
   
   initEventListeners();
+  renderPriorityKeywords();
   await updateAuthStatus();
   await loadSettings();
   

@@ -2,9 +2,7 @@
  * Commit Watch - Notification Creation and Sending
  */
 
-import { truncate, formatTime, getNotificationTypeInfo } from './utils.js';
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
+import { truncate, formatTime, getNotificationTypeInfo, getStorage, setStorage, getSettings } from './support.js';
 import { analyzeCommitType } from './commit-analysis.js';
 import { fetchGitHub } from './github-api.js';
 

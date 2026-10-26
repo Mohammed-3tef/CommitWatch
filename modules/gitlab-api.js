@@ -2,10 +2,9 @@
  * Commit Watch - GitLab API Utilities
  */
 
-import { GITLAB_API_BASE } from './constants.js';
+import { GITLAB_API_BASE } from './support.js';
 import { getGitLabAccessToken } from './auth.js';
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
+import { getStorage, setStorage, getSettings } from './support.js';
 
 /**
  * Rate limit tracking for GitLab
@@ -136,4 +135,3 @@ export async function fetchGitLabProjects() {
   
   return projects;
 }
-

@@ -2,7 +2,7 @@
  * Commit Watch - Commit Analysis and Priority Classification
  */
 
-import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from './constants.js';
+import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from './support.js';
 
 /**
  * Analyze commit type based on structure and files changed

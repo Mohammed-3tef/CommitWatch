@@ -4,8 +4,7 @@
 
 import { fetchGitHub } from './github-api.js';
 import { fetchGitLabProjects, normalizeGitLabProject } from './gitlab-api.js';
-import { getStorage, setStorage } from './storage.js';
-import { getSettings } from './settings.js';
+import { getStorage, setStorage, getSettings } from './support.js';
 import { isGitHubAuthenticated, isGitLabAuthenticated } from './auth.js';
 
 /**

@@ -10,11 +10,8 @@
  */
 
 // Import all modules
-import { setupNotificationHandlers } from './modules/notification-handlers.js';
-import { setupAlarmHandler } from './modules/polling.js';
+import { setupNotificationHandlers, setupAlarmHandler, setupLifecycleHandlers, setupCommandHandlers } from './modules/runtime.js';
 import { setupMessageHandler } from './modules/message-handler.js';
-import { setupLifecycleHandlers } from './modules/lifecycle.js';
-import { setupCommandHandlers } from './modules/commands.js';
 
 // Initialize all handlers
 setupNotificationHandlers();
