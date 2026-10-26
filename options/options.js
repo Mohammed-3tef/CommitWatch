@@ -8,7 +8,7 @@
  * - Filter settings
  */
 
-import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from '../modules/support.js';
+import { COMMIT_KEYWORDS } from '../modules/support.js';
 
 // =============================================================================
 // DOM ELEMENTS
@@ -74,9 +74,11 @@ const elements = {
 
 function renderPriorityKeywords() {
   document.getElementById('high-priority-keywords').textContent =
-    HIGH_PRIORITY_KEYWORDS.join(', ');
+    COMMIT_KEYWORDS.high.join(', ');
   document.getElementById('low-priority-keywords').textContent =
-    LOW_PRIORITY_KEYWORDS.join(', ');
+    COMMIT_KEYWORDS.low.join(', ');
+  document.getElementById('medium-priority-keywords').textContent =
+    COMMIT_KEYWORDS.medium.join(', ');
 }
 
 // Store repositories for filtering

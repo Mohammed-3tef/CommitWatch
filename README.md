@@ -46,9 +46,9 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 
 | Priority | Detection Logic |
 |----------|-----------------|
-| 🔴 **High** | • Security/auth files changed (`auth.js`, `security.js`, `crypto.js`, `password.js`)<br>• Core system files (`index.js`, `main.js`, `server.js`, `kernel.*`)<br>• Database migrations/schema changes<br>• Large deletions (>100 lines, <30% additions)<br>• Multiple critical files modified<br>• Keywords (fallback): `fix`, `hotfix`, `breaking`, `critical`, `urgent`, `security` |
+| 🔴 **High** | • Security/auth files changed (`auth.js`, `security.js`, `crypto.js`, `password.js`)<br>• Core system files (`index.js`, `main.js`, `server.js`, `kernel.*`)<br>• Database migrations/schema changes<br>• Large deletions (>100 lines, <30% additions)<br>• Multiple critical files modified<br>• Keywords (fallback): the shared high-priority catalog in [`modules/support.js`](./modules/support.js) |
 | 🟡 **Medium** | • API/Routes changes (`api/`, `routes/`, `controllers/`)<br>• Build system changes (`webpack`, `vite.config`)<br>• Test files (`.test.js`, `__tests__/`, `spec/`)<br>• Large commits (>500 lines)<br>• Regular code changes<br>• Feature additions |
-| 🟢 **Low** | • Merge commits (2+ parent commits)<br>• Documentation-only (`.md`, `docs/`, `README`, `CHANGELOG`)<br>• Config files (`package.json`, `.eslintrc`, `tsconfig.json`)<br>• CI/CD changes (`.github/workflows/`, `Dockerfile`)<br>• Localization updates (`locales/`, `i18n/`)<br>• Style/formatting keywords: `format`, `style`, `chore`, `refactor` |
+| 🟢 **Low** | • Merge commits (2+ parent commits)<br>• Documentation-only (`.md`, `docs/`, `README`, `CHANGELOG`)<br>• Config files (`package.json`, `.eslintrc`, `tsconfig.json`)<br>• CI/CD changes (`.github/workflows/`, `Dockerfile`)<br>• Localization updates (`locales/`, `i18n/`)<br>• Style and maintenance keywords from the shared low-priority catalog in [`modules/support.js`](./modules/support.js) |
 
 ### 🏷️ Release & Tag Monitoring
 - **Formal Releases** - GitHub and GitLab Release notifications with version info

@@ -2,7 +2,11 @@
  * Commit Watch - Commit Analysis and Priority Classification
  */
 
-import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from './support.js';
+import {
+  HIGH_PRIORITY_KEYWORDS,
+  LOW_PRIORITY_KEYWORDS,
+  MEDIUM_PRIORITY_KEYWORDS
+} from './support.js';
 
 /**
  * Analyze commit type based on structure and files changed
@@ -312,13 +316,21 @@ export function classifyCommitPriority(commit, repo, userData) {
   }
   
   // LOW PRIORITY:
-  // - Contains low-priority keywords (formatting, style, chore)
+  // - Contains a keyword from the shared low-priority catalog
   for (const keyword of LOW_PRIORITY_KEYWORDS) {
     if (message.includes(keyword)) {
       return 'low';
     }
   }
-  
+
+  // Explicit medium-priority keywords remain medium, rather than relying
+  // only on the default classification.
+  for (const keyword of MEDIUM_PRIORITY_KEYWORDS) {
+    if (message.includes(keyword)) {
+      return 'medium';
+    }
+  }
+
   // MEDIUM PRIORITY (default for code commits):
   // - Regular feature additions
   // - Bug fixes without critical keywords
