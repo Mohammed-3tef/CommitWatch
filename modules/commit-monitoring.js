@@ -12,17 +12,17 @@ import { sendCommitNotification } from './notifications.js';
 import { getRepositories } from './repositories.js';
 
 /**
- * Fetch latest commit for a GitHub repository's default branch with full details
+ * Fetch latest commit for a GitHub repository branch with full details
  * 
  * @param {Object} repo - Repository object
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit with files or null
  */
-export async function fetchLatestGitHubCommit(repo, lastKnownSha = null) {
+export async function fetchLatestGitHubCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
   try {
     // First get the latest commit SHA (lightweight request)
     const listResponse = await fetchGitHub(
-      `/repos/${repo.full_name}/commits?sha=${repo.default_branch}&per_page=1`
+      `/repos/${repo.full_name}/commits?sha=${encodeURIComponent(branch)}&per_page=1`
     );
     
     if (!listResponse.ok) {
@@ -42,7 +42,7 @@ export async function fetchLatestGitHubCommit(repo, lastKnownSha = null) {
     // Optimization: If SHA hasn't changed, return basic info only
     // This saves API calls when there are no new commits
     if (lastKnownSha && latestSha === lastKnownSha) {
-      return { ...commits[0], unchanged: true };
+      return { ...commits[0], branch, unchanged: true };
     }
     
     // Fetch full commit details including files only if SHA changed
@@ -52,10 +52,10 @@ export async function fetchLatestGitHubCommit(repo, lastKnownSha = null) {
     
     if (!detailResponse.ok) {
       // Fall back to basic commit info if detailed fetch fails
-      return commits[0];
+      return { ...commits[0], branch };
     }
     
-    return await detailResponse.json();
+    return { ...(await detailResponse.json()), branch };
   } catch (error) {
     console.error(`Error fetching GitHub commits for ${repo.full_name}:`, error);
     return null;
@@ -63,19 +63,19 @@ export async function fetchLatestGitHubCommit(repo, lastKnownSha = null) {
 }
 
 /**
- * Fetch latest commit for a GitLab project's default branch with full details
+ * Fetch latest commit for a GitLab project branch with full details
  * 
  * @param {Object} repo - Repository/project object
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit normalized to GitHub format or null
  */
-export async function fetchLatestGitLabCommit(repo, lastKnownSha = null) {
+export async function fetchLatestGitLabCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
   try {
     const projectId = encodeURIComponent(repo.full_name);
     
     // Get the latest commit
     const listResponse = await fetchGitLab(
-      `/projects/${projectId}/repository/commits?ref_name=${repo.default_branch}&per_page=1`
+      `/projects/${projectId}/repository/commits?ref_name=${encodeURIComponent(branch)}&per_page=1`
     );
     
     if (!listResponse.ok) {
@@ -93,7 +93,7 @@ export async function fetchLatestGitLabCommit(repo, lastKnownSha = null) {
     
     // Optimization: If SHA hasn't changed, return basic info only
     if (lastKnownSha && latestSha === lastKnownSha) {
-      return { sha: latestSha, unchanged: true };
+      return { sha: latestSha, branch, unchanged: true };
     }
     
     // Fetch commit diff to get file changes (only if SHA changed)
@@ -140,7 +140,8 @@ export async function fetchLatestGitLabCommit(repo, lastKnownSha = null) {
       html_url: commit.web_url,
       parents: commit.parent_ids?.map(id => ({ sha: id })) || [],
       files,
-      stats
+      stats,
+      branch
     };
   } catch (error) {
     console.error(`Error fetching GitLab commits for ${repo.full_name}:`, error);
@@ -149,18 +150,63 @@ export async function fetchLatestGitLabCommit(repo, lastKnownSha = null) {
 }
 
 /**
- * Fetch latest commit for a repository's default branch with full details
+ * Fetch latest commit for a repository branch with full details
  * Routes to the appropriate platform-specific function
  * 
  * @param {Object} repo - Repository object
  * @param {string} lastKnownSha - Last known commit SHA (for comparison)
  * @returns {Promise<Object|null>} Latest commit with files or null
  */
-export async function fetchLatestCommit(repo, lastKnownSha = null) {
+export async function fetchLatestCommit(repo, lastKnownSha = null, branch = repo.default_branch) {
   if (repo.platform === 'gitlab') {
-    return fetchLatestGitLabCommit(repo, lastKnownSha);
+    return fetchLatestGitLabCommit(repo, lastKnownSha, branch);
   }
-  return fetchLatestGitHubCommit(repo, lastKnownSha);
+  return fetchLatestGitHubCommit(repo, lastKnownSha, branch);
+}
+
+async function fetchGitHubBranches(repo) {
+  const branches = [];
+  for (let page = 1; page <= 10; page++) {
+    const response = await fetchGitHub(
+      `/repos/${repo.full_name}/branches?per_page=100&page=${page}`
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch GitHub branches: ${response.status}`);
+    }
+    const pageBranches = await response.json();
+    branches.push(...pageBranches);
+    if (pageBranches.length < 100) break;
+  }
+  return branches.map(branch => branch.name);
+}
+
+async function fetchGitLabBranches(repo) {
+  const projectId = encodeURIComponent(repo.full_name);
+  const branches = [];
+  for (let page = 1; page <= 10; page++) {
+    const response = await fetchGitLab(
+      `/projects/${projectId}/repository/branches?per_page=100&page=${page}`
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch GitLab branches: ${response.status}`);
+    }
+    const pageBranches = await response.json();
+    branches.push(...pageBranches);
+    if (pageBranches.length < 100) break;
+  }
+  return branches.map(branch => branch.name);
+}
+
+async function fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey) {
+  const branches = repo.platform === 'gitlab'
+    ? await fetchGitLabBranches(repo)
+    : await fetchGitHubBranches(repo);
+
+  return Promise.all(branches.map(async branch => {
+    const branchKey = `${repoKey}:branch:${encodeURIComponent(branch)}`;
+    const commit = await fetchLatestCommit(repo, lastCommits[branchKey], branch);
+    return commit ? { commit, stateKey: branchKey } : null;
+  })).then(results => results.filter(Boolean));
 }
 
 /**
@@ -171,7 +217,7 @@ export async function fetchLatestCommit(repo, lastKnownSha = null) {
  * @param {Object} settings - User settings
  * @param {Object} userData - GitHub user data
  * @param {Object} gitlabUserData - GitLab user data
- * @returns {Promise<Object|null>} New commit info or null
+ * @returns {Promise<Array>} New commit info entries
  */
 export async function checkRepoForNewCommits(repo, lastCommits, settings, userData, gitlabUserData) {
   // Use platform-specific key for repo settings
@@ -179,52 +225,60 @@ export async function checkRepoForNewCommits(repo, lastCommits, settings, userDa
   
   // Skip if repo is disabled in settings (check both old and new key formats)
   if (settings.enabledRepos[repoKey] === false || settings.enabledRepos[repo.full_name] === false) {
-    return null;
+    return [];
   }
   
-  // Use platform-specific key for last commits
-  const lastKnownSha = lastCommits[repoKey] || lastCommits[repo.full_name];
-  const latestCommit = await fetchLatestCommit(repo, lastKnownSha);
-  
-  if (!latestCommit) {
-    return null;
-  }
-  
-  // Skip if commit unchanged (optimization)
-  if (latestCommit.unchanged) {
-    return null;
-  }
-  
-  // If this is the first check, just store the SHA
-  if (!lastKnownSha) {
-    return { repo, commit: latestCommit, isNew: false, repoKey };
-  }
-  
-  // Check if there's a new commit
-  if (latestCommit.sha !== lastKnownSha) {
-    // Skip own commits if setting is enabled
-    if (settings.ignoreOwnCommits) {
-      const authorLogin = latestCommit.author?.login;
-      const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
-      if (currentUser && authorLogin === currentUser.login) {
-        return { repo, commit: latestCommit, isNew: false, repoKey };
-      }
+  const trackingAllBranches = settings.commitTrackingMode === 'all';
+  const commitsToCheck = trackingAllBranches
+    ? await fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey)
+    : [{
+        commit: await fetchLatestCommit(
+          repo,
+          lastCommits[repoKey] || lastCommits[repo.full_name],
+          repo.default_branch
+        ),
+        stateKey: repoKey
+      }];
+  const results = [];
+
+  for (const entry of commitsToCheck) {
+    const latestCommit = entry.commit;
+    if (!latestCommit || latestCommit.unchanged) continue;
+
+    const lastKnownSha = lastCommits[entry.stateKey] ||
+      (!trackingAllBranches ? lastCommits[repo.full_name] : null);
+
+    if (!lastKnownSha) {
+      results.push({ repo, commit: latestCommit, isNew: false, repoKey: entry.stateKey });
+      continue;
     }
-    
-    // New commit found!
-    const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
-    const priority = classifyCommitPriority(latestCommit, repo, currentUser);
-    
-    return {
-      repo,
-      commit: latestCommit,
-      isNew: true,
-      priority,
-      repoKey
-    };
+
+    if (latestCommit.sha !== lastKnownSha) {
+      // Skip own commits if setting is enabled
+      if (settings.ignoreOwnCommits) {
+        const authorLogin = latestCommit.author?.login;
+        const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
+        if (currentUser && authorLogin === currentUser.login) {
+          results.push({ repo, commit: latestCommit, isNew: false, repoKey: entry.stateKey });
+          continue;
+        }
+      }
+
+      // New commit found!
+      const currentUser = repo.platform === 'gitlab' ? gitlabUserData : userData;
+      const priority = classifyCommitPriority(latestCommit, repo, currentUser);
+
+      results.push({
+        repo,
+        commit: latestCommit,
+        isNew: true,
+        priority,
+        repoKey: entry.stateKey
+      });
+    }
   }
-  
-  return null;
+
+  return results;
 }
 
 /**
@@ -269,8 +323,8 @@ export async function checkAllRepositoriesForCommits() {
         batch.map(repo => checkRepoForNewCommits(repo, lastCommits, settings, userData, gitlabUserData))
       );
       
-      for (const result of results) {
-        if (result) {
+      for (const repoResults of results) {
+        for (const result of repoResults) {
           // Update last known commit using platform-specific key
           const key = result.repoKey || result.repo.full_name;
           updatedLastCommits[key] = result.commit.sha;

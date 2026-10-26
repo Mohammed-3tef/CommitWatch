@@ -13,6 +13,7 @@ export async function getSettings() {
   const { settings } = await getStorage('settings');
   return {
     checkInterval: DEFAULT_CHECK_INTERVAL,
+    commitTrackingMode: 'default',
     ignoreForks: true,
     ignoreOwnCommits: false,
     enabledRepos: {}, // { 'platform:owner/repo': true/false }

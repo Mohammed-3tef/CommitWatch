@@ -117,7 +117,7 @@ export async function sendCommitNotification(repo, commit, priority) {
     repoName: repo.full_name,
     title: detailedMessage,
     message: description,
-    contextMessage: `${timeStr} · ${typeInfo.label} · ${shortSha}`,
+    contextMessage: `${timeStr} · ${typeInfo.label} · ${commit.branch ? `${commit.branch} · ` : ''}${shortSha}`,
     buttons: [
       { title: 'View Commit' },
       { title: 'Mark as Read' }
@@ -137,6 +137,7 @@ export async function sendCommitNotification(repo, commit, priority) {
     message: title,
     priority,
     sha: commit.sha,
+    branch: commit.branch,
     url: commit.html_url,
     filesChanged,
     additions,

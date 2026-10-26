@@ -50,6 +50,7 @@ const elements = {
   notificationsEnabled: document.getElementById('notifications-enabled'),
   releaseNotifications: document.getElementById('release-notifications'),
   checkInterval: document.getElementById('check-interval'),
+  commitTrackingMode: document.getElementById('commit-tracking-mode'),
   ignoreForks: document.getElementById('ignore-forks'),
   ignoreOwn: document.getElementById('ignore-own'),
   
@@ -1282,6 +1283,7 @@ async function loadSettings() {
       elements.notificationsEnabled.checked = settings.notificationsEnabled !== false;
       elements.releaseNotifications.checked = settings.releaseNotificationsEnabled !== false;
       elements.checkInterval.value = settings.checkInterval || 5;
+      elements.commitTrackingMode.value = settings.commitTrackingMode || 'default';
       elements.ignoreForks.checked = settings.ignoreForks !== false;
       elements.ignoreOwn.checked = settings.ignoreOwnCommits === true;
     }
@@ -1698,6 +1700,10 @@ function initEventListeners() {
   
   elements.checkInterval.addEventListener('change', (e) => {
     saveSetting('checkInterval', parseInt(e.target.value));
+  });
+
+  elements.commitTrackingMode.addEventListener('change', (e) => {
+    saveSetting('commitTrackingMode', e.target.value);
   });
   
   elements.ignoreForks.addEventListener('change', (e) => {

@@ -8,5 +8,14 @@ export const ALARM_NAME = 'commit-check-alarm';
 export const DEFAULT_CHECK_INTERVAL = 5; // minutes
 
 // Priority keywords for commit classification
-export const HIGH_PRIORITY_KEYWORDS = ['fix', 'hotfix', 'breaking', 'critical', 'urgent', 'security'];
-export const LOW_PRIORITY_KEYWORDS = ['merge', 'docs', 'documentation', 'format', 'formatting', 'style', 'chore'];
+export const HIGH_PRIORITY_KEYWORDS = [
+  'fix', 'hotfix', 'bug', 'bugfix', 'regression', 'breaking',
+  'critical', 'urgent', 'emergency', 'security', 'vulnerability',
+  'exploit', 'incident', 'outage', 'crash', 'panic', 'data loss',
+  'rollback', 'failure'
+];
+export const LOW_PRIORITY_KEYWORDS = [
+  'merge', 'docs', 'documentation', 'format', 'formatting', 'style',
+  'chore', 'refactor', 'cleanup', 'clean up', 'rename', 'reorganize',
+  'restructure', 'whitespace', 'lint', 'typo', 'comment', 'comments'
+];

@@ -2,7 +2,7 @@
  * Commit Watch - Commit Analysis and Priority Classification
  */
 
-import { HIGH_PRIORITY_KEYWORDS } from './constants.js';
+import { HIGH_PRIORITY_KEYWORDS, LOW_PRIORITY_KEYWORDS } from './constants.js';
 
 /**
  * Analyze commit type based on structure and files changed
@@ -313,8 +313,7 @@ export function classifyCommitPriority(commit, repo, userData) {
   
   // LOW PRIORITY:
   // - Contains low-priority keywords (formatting, style, chore)
-  const lowKeywords = ['format', 'formatting', 'style', 'chore', 'refactor', 'rename'];
-  for (const keyword of lowKeywords) {
+  for (const keyword of LOW_PRIORITY_KEYWORDS) {
     if (message.includes(keyword)) {
       return 'low';
     }

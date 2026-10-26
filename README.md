@@ -62,6 +62,7 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 - Enable/disable notifications per repository
 - Ignore forked repositories
 - Ignore your own commits
+- Choose to monitor the main/master branch or all branches
 - Configurable check frequency (1-60 minutes)
 
 ### 🛡️ Efficient & Secure
@@ -136,6 +137,7 @@ Create a new token at [gitlab.com/-/profile/personal_access_tokens](https://gitl
 | Enable Notifications | Receive Chrome notifications for all activity | ✅ On |
 | Release Notifications | Monitor GitHub & GitLab Releases and Git tags | ✅ On |
 | Check Frequency | How often to poll for commits/releases | 5 minutes |
+| Commit Branches | Monitor the main/master branch or all branches | Main/master branch |
 | Ignore Forks | Don't monitor forked repositories | ✅ On |
 | Ignore Own Commits | Don't notify for your commits | ❌ Off |
 | Per-Repo Toggle | Enable/disable individual repositories | All enabled |
