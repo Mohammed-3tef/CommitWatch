@@ -143,8 +143,180 @@ body {
   text-decoration: underline;
 }
 
+#customize-shortcuts-link[aria-disabled="true"] {
+  color: var(--color-text-muted);
+  cursor: default;
+  text-decoration: none;
+}
+
 .hidden {
   display: none !important;
+}
+
+.activity-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
+.activity-platform-filter {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin: var(--spacing-md) 0;
+}
+
+.activity-platform-filter .filter-label {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.activity-toolbar input,
+.activity-toolbar select {
+  min-width: 140px;
+  flex: 1;
+  padding: 8px 10px;
+  color: var(--color-text);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.activity-toolbar input:first-child {
+  min-width: 280px;
+  flex: 2;
+}
+
+.activity-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+  max-height: 680px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+.activity-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  padding: var(--spacing-lg);
+  background-color: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.activity-item:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-secondary);
+}
+
+.activity-item-header,
+.activity-item-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.activity-item-labels {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.activity-item-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  width: 100%;
+  min-width: 0;
+}
+
+.activity-title {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.activity-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--spacing-md);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.activity-meta a {
+  color: var(--color-text-link);
+  text-decoration: none;
+}
+
+.activity-meta a:hover {
+  text-decoration: underline;
+}
+
+.activity-detail {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: capitalize;
+}
+
+.activity-type,
+.activity-platform,
+.activity-priority {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  font-size: 11px;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.activity-type {
+  color: var(--color-text);
+  background: var(--color-surface-hover);
+}
+
+.activity-platform {
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.activity-platform-github {
+  color: var(--color-text-link);
+}
+
+.activity-platform-gitlab {
+  color: #fc6d26;
+}
+
+.activity-priority-high { color: var(--color-priority-high); }
+.activity-priority-medium { color: var(--color-priority-medium); }
+.activity-priority-low { color: var(--color-priority-low); }
+
+.activity-item-footer {
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-border);
+}
+
+.activity-item-footer code {
+  color: var(--color-text-muted);
+}
+
+.activity-link {
+  color: var(--color-text-link);
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 code {
@@ -1129,6 +1301,21 @@ input::placeholder {
   .charts-container {
     grid-template-columns: 1fr;
   }
+
+  .activity-list {
+    grid-template-columns: 1fr;
+  }
+
+  .activity-toolbar input,
+  .activity-toolbar select {
+    min-width: 0;
+    flex-basis: calc(50% - var(--spacing-xs));
+  }
+
+  .activity-toolbar input:first-child {
+    min-width: 0;
+    flex-basis: 100%;
+  }
   
   .time-range-selector {
     max-width: 100%;
@@ -1249,6 +1436,17 @@ input::placeholder {
   
   .priority-card {
     padding: var(--spacing-sm);
+  }
+
+  .activity-toolbar input,
+  .activity-toolbar select,
+  .activity-toolbar .btn {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .activity-item {
+    padding: var(--spacing-md);
   }
   
   .footer p {

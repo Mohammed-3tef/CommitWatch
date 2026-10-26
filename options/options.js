@@ -47,6 +47,20 @@ const elements = {
   gitlabStats: document.getElementById('gitlab-stats'),
   githubEmptyState: document.getElementById('github-empty-state'),
   gitlabEmptyState: document.getElementById('gitlab-empty-state'),
+
+  // Activity dashboard
+  activityCount: document.getElementById('activity-count'),
+  activitySearch: document.getElementById('activity-search'),
+  activityRepository: document.getElementById('activity-repository'),
+  activityType: document.getElementById('activity-type'),
+  activityPriority: document.getElementById('activity-priority'),
+  activityDate: document.getElementById('activity-date'),
+  activityBranch: document.getElementById('activity-branch'),
+  activityAuthor: document.getElementById('activity-author'),
+  refreshActivityBtn: document.getElementById('refresh-activity-btn'),
+  exportActivityJsonBtn: document.getElementById('export-activity-json-btn'),
+  exportActivityCsvBtn: document.getElementById('export-activity-csv-btn'),
+  activityList: document.getElementById('activity-list'),
   
   // Settings elements
   notificationsEnabled: document.getElementById('notifications-enabled'),
@@ -81,10 +95,208 @@ function renderPriorityKeywords() {
     COMMIT_KEYWORDS.medium.join(', ');
 }
 
+async function configureShortcutLink() {
+  const shortcutLink = document.getElementById('customize-shortcuts-link');
+  if (!shortcutLink) return;
+
+  const userAgent = navigator.userAgent;
+  let settingsUrl = '';
+  let isBrave = false;
+
+  if (navigator.brave?.isBrave) {
+    try {
+      isBrave = await navigator.brave.isBrave();
+    } catch (error) {
+      console.warn('Unable to detect Brave browser:', error);
+    }
+  }
+
+  if (/Firefox\//i.test(userAgent)) {
+    settingsUrl = 'about:addons';
+  } else if (isBrave) {
+    settingsUrl = 'brave://extensions/shortcuts';
+  } else if (/Edg\//i.test(userAgent)) {
+    settingsUrl = 'edge://extensions/shortcuts';
+  } else if (/OPR\//i.test(userAgent)) {
+    settingsUrl = 'opera://settings/keyboardShortcuts';
+  } else if (/Vivaldi\//i.test(userAgent)) {
+    settingsUrl = 'vivaldi://extensions/shortcuts';
+  } else if (/Chrome\//i.test(userAgent)) {
+    settingsUrl = 'chrome://extensions/shortcuts';
+  }
+
+  if (settingsUrl) {
+    shortcutLink.href = settingsUrl;
+  } else {
+    shortcutLink.removeAttribute('href');
+    shortcutLink.setAttribute('aria-disabled', 'true');
+    shortcutLink.addEventListener('click', event => event.preventDefault());
+  }
+}
+
 // Store repositories for filtering
 let allRepositories = [];
 let currentPlatformFilter = 'all';
 let currentSearchQuery = '';
+let activityHistory = [];
+let currentActivityPlatform = 'all';
+
+function getActivityType(item) {
+  if (item.type === 'commit') return 'commit';
+  if (item.type === 'release' || item.type === 'tag') return item.type;
+  if (item.reason === 'security_alert' || item.subType === 'CheckSuite') return 'alert';
+  if (item.subType === 'PullRequest') return 'pull_request';
+  if (item.type === 'github') return 'alert';
+  return item.type || 'alert';
+}
+
+function getActivityTitle(item) {
+  return item.message || item.title || item.releaseName || item.tagName || item.reason || 'Repository activity';
+}
+
+function getActivitySearchText(item) {
+  return [
+    getActivityTitle(item), item.repo, item.author, item.branch, item.commitType,
+    item.subType, item.reason, item.tagName, item.releaseName
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
+function formatActivityDate(timestamp) {
+  return timestamp ? new Date(timestamp).toLocaleString() : 'Unknown time';
+}
+
+function renderActivityRepositoryOptions() {
+  const repositories = [...new Set(activityHistory.map(item => item.repo).filter(Boolean))].sort();
+  const selected = elements.activityRepository.value;
+  elements.activityRepository.innerHTML = '<option value="">All repositories</option>' +
+    repositories.map(repo => `<option value="${escapeHtml(repo)}">${escapeHtml(repo)}</option>`).join('');
+  elements.activityRepository.value = repositories.includes(selected) ? selected : '';
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, character => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[character]));
+}
+
+function getFilteredActivity() {
+  const query = elements.activitySearch.value.trim().toLowerCase();
+  const repository = elements.activityRepository.value;
+  const type = elements.activityType.value;
+  const priority = elements.activityPriority.value;
+  const branch = elements.activityBranch.value.trim().toLowerCase();
+  const author = elements.activityAuthor.value.trim().toLowerCase();
+  const days = elements.activityDate.value === 'all' ? null : Number(elements.activityDate.value);
+  const since = days ? Date.now() - days * 24 * 60 * 60 * 1000 : 0;
+
+  return activityHistory.filter(item => {
+    const itemType = getActivityType(item);
+    return (!query || getActivitySearchText(item).includes(query)) &&
+      (currentActivityPlatform === 'all' || (item.platform || 'github') === currentActivityPlatform) &&
+      (!repository || item.repo === repository) &&
+      (!type || itemType === type) &&
+      (!priority || item.priority === priority) &&
+      (!branch || String(item.branch || '').toLowerCase().includes(branch)) &&
+      (!author || String(item.author || '').toLowerCase().includes(author)) &&
+      (!since || (item.timestamp || 0) >= since);
+  });
+}
+
+function renderActivityHistory() {
+  const filtered = getFilteredActivity();
+  elements.activityCount.textContent = filtered.length === activityHistory.length
+    ? String(filtered.length) : `${filtered.length} / ${activityHistory.length}`;
+  if (!filtered.length) {
+    elements.activityList.innerHTML = '<p class="empty-state">No activity matches the current filters.</p>';
+    return;
+  }
+  elements.activityList.innerHTML = filtered.map(item => {
+    const type = getActivityType(item);
+    const priority = item.priority || 'medium';
+    const title = escapeHtml(getActivityTitle(item));
+    const platform = item.platform || 'github';
+    const platformBaseUrl = platform === 'gitlab' ? 'https://gitlab.com' : 'https://github.com';
+    const repositoryUrl = item.repo ? `${platformBaseUrl}/${item.repo}` : '';
+    const branchUrl = item.repo && item.branch
+      ? `${repositoryUrl}/commits/${encodeURIComponent(item.branch)}`
+      : '';
+    const authorUrl = item.author
+      ? `${platformBaseUrl}/${encodeURIComponent(item.author)}`
+      : '';
+    const metadata = [
+      repositoryUrl
+        ? `<a href="${escapeHtml(repositoryUrl)}" target="_blank" rel="noopener">${escapeHtml(item.repo)}</a>`
+        : '',
+      branchUrl
+        ? `Branch: <a href="${escapeHtml(branchUrl)}" target="_blank" rel="noopener">${escapeHtml(item.branch)}</a>`
+        : '',
+      authorUrl
+        ? `By <a href="${escapeHtml(authorUrl)}" target="_blank" rel="noopener">${escapeHtml(item.author)}</a>`
+        : '',
+      escapeHtml(formatActivityDate(item.timestamp))
+    ].filter(Boolean);
+    const detail = item.commitType || item.reason || item.tagName || '';
+    const link = item.url ? `<a class="activity-link" href="${escapeHtml(item.url)}" target="_blank" rel="noopener">Open</a>` : '';
+    return `<article class="activity-item">
+      <div class="activity-item-header">
+        <div class="activity-item-labels">
+          <span class="activity-type activity-type-${type}">${escapeHtml(type.replace('_', ' '))}</span>
+          <span class="activity-platform activity-platform-${escapeHtml(platform)}">${escapeHtml(platform)}</span>
+        </div>
+        <span class="activity-priority activity-priority-${priority}">${escapeHtml(priority)}</span>
+      </div>
+      <div class="activity-item-main">
+        <strong class="activity-title">${title}</strong>
+        ${detail ? `<div class="activity-detail">${escapeHtml(detail)}</div>` : ''}
+        <div class="activity-meta">${metadata.map(value => `<span>${value}</span>`).join('')}</div>
+      </div>
+      <div class="activity-item-footer">
+        ${item.sha ? `<code>${escapeHtml(item.sha.slice(0, 7))}</code>` : '<span></span>'}
+        ${link}
+      </div>
+    </article>`;
+  }).join('');
+}
+
+async function loadActivityHistory() {
+  try {
+    const response = await sendMessage({ action: 'getNotificationHistory' });
+    if (!response.success) throw new Error(response.error || 'Failed to load activity');
+    activityHistory = Array.isArray(response.history) ? response.history : [];
+    renderActivityRepositoryOptions();
+    renderActivityHistory();
+  } catch (error) {
+    console.error('Failed to load activity history:', error);
+    elements.activityList.innerHTML = '<p class="empty-state">Failed to load activity history.</p>';
+  }
+}
+
+function downloadActivity(data, extension, mimeType) {
+  const blob = new Blob([data], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `commit-watch-activity-${new Date().toISOString().slice(0, 10)}.${extension}`;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportActivityJson() {
+  downloadActivity(JSON.stringify(getFilteredActivity(), null, 2), 'json', 'application/json');
+}
+
+function exportActivityCsv() {
+  const columns = ['timestamp', 'type', 'platform', 'repo', 'branch', 'author', 'priority', 'title', 'url'];
+  const rows = getFilteredActivity().map(item => [
+    item.timestamp ? new Date(item.timestamp).toISOString() : '',
+    getActivityType(item), item.platform || '', item.repo || '', item.branch || '',
+    item.author || '', item.priority || '', getActivityTitle(item), item.url || ''
+  ]);
+  const csv = [columns, ...rows].map(row => row.map(value =>
+    `"${String(value).replace(/"/g, '""')}"`
+  ).join(',')).join('\r\n');
+  downloadActivity(csv, 'csv', 'text/csv;charset=utf-8');
+}
 
 // Chart instances
 let githubChartInstance = null;
@@ -1740,6 +1952,30 @@ function initEventListeners() {
   // Analytics
   elements.timeRangeSelect.addEventListener('change', handleTimeRangeChange);
   elements.refreshChartsBtn.addEventListener('click', handleRefreshCharts);
+
+  // Activity dashboard (local-only; no API refresh)
+  document.querySelectorAll('.activity-platform-filter-btn').forEach(button => {
+    button.addEventListener('click', () => {
+      currentActivityPlatform = button.dataset.activityPlatform;
+      document.querySelectorAll('.activity-platform-filter-btn').forEach(filterButton => {
+        filterButton.classList.toggle('active', filterButton === button);
+      });
+      renderActivityHistory();
+    });
+  });
+
+  [
+    elements.activitySearch, elements.activityRepository, elements.activityType,
+    elements.activityPriority, elements.activityDate, elements.activityBranch,
+    elements.activityAuthor
+  ].forEach(element => element.addEventListener('input', renderActivityHistory));
+  elements.activityRepository.addEventListener('change', renderActivityHistory);
+  elements.activityType.addEventListener('change', renderActivityHistory);
+  elements.activityPriority.addEventListener('change', renderActivityHistory);
+  elements.activityDate.addEventListener('change', renderActivityHistory);
+  elements.refreshActivityBtn.addEventListener('click', loadActivityHistory);
+  elements.exportActivityJsonBtn.addEventListener('click', exportActivityJson);
+  elements.exportActivityCsvBtn.addEventListener('click', exportActivityCsv);
   
   // Chart downloads
   document.getElementById('download-github-chart-btn').addEventListener('click', () => downloadChart('github'));
@@ -1761,9 +1997,11 @@ async function init() {
   await initTheme();
   
   initEventListeners();
+  await configureShortcutLink();
   renderPriorityKeywords();
   await updateAuthStatus();
   await loadSettings();
+  await loadActivityHistory();
   
   // Initialize analytics charts
   await updateAllCharts();

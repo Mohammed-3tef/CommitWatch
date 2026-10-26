@@ -56,7 +56,7 @@ export async function createUnifiedNotification({
 export async function storeNotificationHistory(notification) {
   const { notificationHistory = [] } = await getStorage('notificationHistory');
   notificationHistory.unshift({ ...notification, timestamp: Date.now() });
-  await setStorage({ notificationHistory: notificationHistory.slice(0, 100) });
+  await setStorage({ notificationHistory: notificationHistory.slice(0, 1000) });
 }
 
 /**
@@ -294,6 +294,7 @@ export async function sendGitHubNotification(notification) {
     platform: 'github',
     subType: notification.subject.type,
     reason: notification.reason,
+    priority: notification.reason === 'security_alert' ? 'high' : 'medium',
     repo: notification.repository.full_name,
     title: notification.subject.title,
     url: notification.subject.url 
