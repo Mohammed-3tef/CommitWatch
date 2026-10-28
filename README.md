@@ -8,6 +8,7 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 [![GitHub API](https://img.shields.io/badge/GitHub-API-181717?logo=github)](https://docs.github.com/en/rest)
 [![GitLab API](https://img.shields.io/badge/GitLab-API-FCA121?logo=gitlab)](https://docs.gitlab.com/ee/api/)
 [![License](https://img.shields.io/badge/License-MPL-blue)](./LICENSE)
+[![Donate](https://img.shields.io/badge/Donate-Support%20Commit%20Watch-e91e63?logo=heart)](https://mohammedatefportfolio.vercel.app/extensions/donate/?extension=Commit%20Watch)
 
 > **🎯 Never miss important commits!** Get intelligent notifications for critical code changes, security updates, and releases from **GitHub and GitLab** without the noise.
 
