@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Commit Watch",
-  "version": "2.2.2",
+  "version": "2.2.1",
   "description": "Intelligently monitors GitHub and GitLab repositories and notifies you about important commits, releases, and activity with automatic file-based detection.",
   
   "permissions": [
