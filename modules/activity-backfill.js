@@ -8,6 +8,7 @@ import { getStorage, setStorage } from './support.js';
 import { classifyCommitPriority } from './commit-analysis.js';
 
 const MAX_PAGES = 10;
+const MAX_BRANCHES = 1000;
 
 function getPeriod(days) {
   const until = new Date();
@@ -15,7 +16,7 @@ function getPeriod(days) {
   return { since: since.toISOString(), until: until.toISOString() };
 }
 
-function normalizeGitHubCommit(repo, commit) {
+function normalizeGitHubCommit(repo, commit, branch) {
   const author = commit.author?.login || commit.commit?.author?.name || 'Unknown';
   const message = commit.commit?.message?.split('\n')[0] || 'No message';
   const date = commit.commit?.author?.date || commit.commit?.committer?.date;
@@ -43,14 +44,14 @@ function normalizeGitHubCommit(repo, commit) {
     message,
     priority: classifyCommitPriority(normalized, repo, null),
     sha: commit.sha,
-    branch: repo.default_branch || 'main',
+    branch,
     url: commit.html_url || `https://github.com/${repo.full_name}/commit/${commit.sha}`,
     timestamp: date ? new Date(date).getTime() : Date.now(),
     backfilled: true
   };
 }
 
-function normalizeGitLabCommit(repo, commit) {
+function normalizeGitLabCommit(repo, commit, branch) {
   const author = commit.author_name || 'Unknown';
   const message = commit.title || commit.message?.split('\n')[0] || 'No message';
   const date = commit.authored_date || commit.committed_date;
@@ -75,18 +76,18 @@ function normalizeGitLabCommit(repo, commit) {
     message,
     priority: classifyCommitPriority(normalized, repo, null),
     sha: commit.id,
-    branch: repo.default_branch || 'main',
+    branch,
     url: commit.web_url || `https://gitlab.com/${repo.full_name}/-/commit/${commit.id}`,
     timestamp: date ? new Date(date).getTime() : Date.now(),
     backfilled: true
   };
 }
 
-async function fetchGitHubHistory(repo, period) {
+async function fetchGitHubHistory(repo, period, branch) {
   const commits = [];
   for (let page = 1; page <= MAX_PAGES; page++) {
     const params = new URLSearchParams({
-      sha: repo.default_branch || 'main',
+      sha: branch,
       since: period.since,
       until: period.until,
       per_page: '100',
@@ -98,18 +99,18 @@ async function fetchGitHubHistory(repo, period) {
     }
 
     const pageCommits = await response.json();
-    commits.push(...pageCommits.map(commit => normalizeGitHubCommit(repo, commit)));
+    commits.push(...pageCommits.map(commit => normalizeGitHubCommit(repo, commit, branch)));
     if (pageCommits.length < 100) break;
   }
   return commits;
 }
 
-async function fetchGitLabHistory(repo, period) {
+async function fetchGitLabHistory(repo, period, branch) {
   const commits = [];
   const projectId = encodeURIComponent(repo.full_name);
   for (let page = 1; page <= MAX_PAGES; page++) {
     const params = new URLSearchParams({
-      ref_name: repo.default_branch || 'main',
+      ref_name: branch,
       since: period.since,
       until: period.until,
       per_page: '100',
@@ -121,7 +122,7 @@ async function fetchGitLabHistory(repo, period) {
     }
 
     const pageCommits = await response.json();
-    commits.push(...pageCommits.map(commit => normalizeGitLabCommit(repo, commit)));
+    commits.push(...pageCommits.map(commit => normalizeGitLabCommit(repo, commit, branch)));
     if (pageCommits.length < 100) break;
   }
   return commits;
@@ -131,15 +132,25 @@ async function fetchGitLabHistory(repo, period) {
  * Import recent default-branch commits into local activity history.
  * This intentionally does not send notifications or increment the badge.
  */
-export async function backfillRepositoryHistory(repo, days) {
+export async function backfillRepositoryHistory(repo, days, includeAllBranches = false) {
   if (![7, 30, 90].includes(days)) {
     throw new Error('Backfill period must be 7, 30, or 90 days');
   }
 
   const period = getPeriod(days);
-  const imported = repo.platform === 'gitlab'
-    ? await fetchGitLabHistory(repo, period)
-    : await fetchGitHubHistory(repo, period);
+  const { settings = {} } = await getStorage('settings');
+  const trackingAllBranches = includeAllBranches || settings.commitTrackingMode === 'all';
+  let branches = [repo.default_branch || 'main'];
+  if (trackingAllBranches) {
+    branches = await fetchBranches(repo);
+  }
+  const imported = [];
+  for (const branch of branches) {
+    const branchCommits = repo.platform === 'gitlab'
+      ? await fetchGitLabHistory(repo, period, branch)
+      : await fetchGitHubHistory(repo, period, branch);
+    imported.push(...branchCommits);
+  }
   const { notificationHistory = [] } = await getStorage('notificationHistory');
   const existingIds = new Set(notificationHistory.map(item => item.id));
   const newItems = imported.filter(item => !existingIds.has(item.id));
@@ -148,5 +159,37 @@ export async function backfillRepositoryHistory(repo, days) {
     .slice(0, 1000);
 
   await setStorage({ notificationHistory: mergedHistory });
-  return { imported: newItems.length, scanned: imported.length, days };
+  return { imported: newItems.length, scanned: imported.length, days, branches: branches.length };
+}
+
+export async function backfillAllRepositoriesHistory(repositories, days = 90) {
+  const results = [];
+  for (const repo of repositories) {
+    try {
+      results.push({
+        repo: repo.full_name,
+        ...(await backfillRepositoryHistory(repo, days, true))
+      });
+    } catch (error) {
+      console.error(`[Commit Watch] Failed to backfill all branches for ${repo.full_name}:`, error);
+      results.push({ repo: repo.full_name, error: error.message });
+    }
+  }
+  return results;
+}
+
+async function fetchBranches(repo) {
+  const branches = [];
+  for (let page = 1; page <= 10; page++) {
+    const response = repo.platform === 'gitlab'
+      ? await fetchGitLab(`/projects/${encodeURIComponent(repo.full_name)}/repository/branches?per_page=100&page=${page}`)
+      : await fetchGitHub(`/repos/${repo.full_name}/branches?per_page=100&page=${page}`);
+    if (!response.ok) {
+      throw new Error(`Failed to load branches: ${response.status}`);
+    }
+    const pageBranches = await response.json();
+    branches.push(...pageBranches.map(branch => branch.name).filter(Boolean));
+    if (pageBranches.length < 100 || branches.length >= MAX_BRANCHES) break;
+  }
+  return branches.slice(0, MAX_BRANCHES);
 }

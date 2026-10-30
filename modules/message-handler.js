@@ -8,6 +8,7 @@ import {
   setGitLabAccessToken, 
   isGitHubAuthenticated, 
   isGitLabAuthenticated,
+  isAuthenticated,
   logout 
 } from './auth.js';
 import { fetchGitHub } from './github-api.js';
@@ -19,7 +20,10 @@ import { checkAllRepositoriesForCommits } from './commit-monitoring.js';
 import { checkAllRepositoriesForReleases } from './release-monitoring.js';
 import { checkGitHubNotifications } from './notifications.js';
 import { startPolling, stopPolling } from './runtime.js';
-import { backfillRepositoryHistory } from './activity-backfill.js';
+import {
+  backfillRepositoryHistory,
+  backfillAllRepositoriesHistory
+} from './activity-backfill.js';
 
 /**
  * Async message handler
@@ -161,7 +165,11 @@ export async function handleMessage(message) {
         }
         return {
           success: true,
-          result: await backfillRepositoryHistory(message.repository, Number(message.days))
+          result: await backfillRepositoryHistory(
+            message.repository,
+            Number(message.days),
+            message.includeAllBranches === true
+          )
         };
         
       case 'updateSettings':
@@ -169,10 +177,24 @@ export async function handleMessage(message) {
         const newSettings = { ...currentSettings, ...message.settings };
         await setStorage({ settings: newSettings });
         
+        const settingsChanged = Object.keys(message.settings || {});
+        const shouldCheckImmediately = settingsChanged.includes('commitTrackingMode');
+
         // Restart polling with new interval if changed
         if (Object.hasOwn(message.settings, 'checkInterval') && await isAuthenticated()) {
           await stopPolling();
           await startPolling();
+        }
+
+        if (shouldCheckImmediately && await isAuthenticated()) {
+          await checkAllRepositoriesForCommits();
+          if (message.settings.commitTrackingMode === 'all') {
+            const results = await backfillAllRepositoriesHistory(await getRepositories());
+            await setStorage({
+              lastAllBranchHistoryBackfill: Date.now(),
+              lastAllBranchHistoryBackfillResult: results
+            });
+          }
         }
         
         return { success: true };

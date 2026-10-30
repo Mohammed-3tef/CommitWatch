@@ -7,6 +7,25 @@ import { isAuthenticated } from './auth.js';
 import { checkAllRepositoriesForCommits } from './commit-monitoring.js';
 import { checkAllRepositoriesForReleases } from './release-monitoring.js';
 import { checkGitHubNotifications } from './notifications.js';
+import { getRepositories } from './repositories.js';
+import { backfillAllRepositoriesHistory } from './activity-backfill.js';
+
+const ALL_BRANCH_HISTORY_INTERVAL = 6 * 60 * 60 * 1000;
+
+async function maybeBackfillAllBranchHistory() {
+  const settings = await getSettings();
+  if (settings.commitTrackingMode !== 'all') return;
+
+  const { lastAllBranchHistoryBackfill = 0 } = await getStorage('lastAllBranchHistoryBackfill');
+  if (Date.now() - lastAllBranchHistoryBackfill < ALL_BRANCH_HISTORY_INTERVAL) return;
+
+  const results = await backfillAllRepositoriesHistory(await getRepositories());
+  await setStorage({
+    lastAllBranchHistoryBackfill: Date.now(),
+    lastAllBranchHistoryBackfillResult: results
+  });
+  console.log(`[Commit Watch] Automatic all-branch history completed for ${results.length} repositories`);
+}
 
 export async function startPolling() {
   const settings = await getSettings();
@@ -14,6 +33,7 @@ export async function startPolling() {
     periodInMinutes: settings.checkInterval,
     delayInMinutes: 0.1
   });
+  await maybeBackfillAllBranchHistory();
   console.log(`[Commit Watch] Polling started every ${settings.checkInterval} minutes`);
 }
 

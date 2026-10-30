@@ -164,7 +164,7 @@ export async function fetchLatestCommit(repo, lastKnownSha = null, branch = repo
 
 async function fetchGitHubBranches(repo) {
   const branches = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; ; page++) {
     const response = await fetchGitHub(
       `/repos/${repo.full_name}/branches?per_page=100&page=${page}`
     );
@@ -181,7 +181,7 @@ async function fetchGitHubBranches(repo) {
 async function fetchGitLabBranches(repo) {
   const projectId = encodeURIComponent(repo.full_name);
   const branches = [];
-  for (let page = 1; page <= 10; page++) {
+  for (let page = 1; ; page++) {
     const response = await fetchGitLab(
       `/projects/${projectId}/repository/branches?per_page=100&page=${page}`
     );
@@ -199,6 +199,8 @@ async function fetchLatestCommitsForAllBranches(repo, lastCommits, repoKey) {
   const branches = repo.platform === 'gitlab'
     ? await fetchGitLabBranches(repo)
     : await fetchGitHubBranches(repo);
+
+  console.log(`[Commit Watch] Checking ${branches.length} branches for ${repo.full_name}`);
 
   return Promise.all(branches.map(async branch => {
     const branchKey = `${repoKey}:branch:${encodeURIComponent(branch)}`;

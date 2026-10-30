@@ -153,6 +153,36 @@ body {
   display: none !important;
 }
 
+.dashboard-mode .settings-section:not(.dashboard-section) {
+  display: none;
+}
+
+.settings-section.dashboard-section {
+  display: none;
+}
+
+.dashboard-mode .settings-section.dashboard-section {
+  display: block;
+}
+
+.dashboard-mode .header {
+  margin-bottom: var(--spacing-xl);
+}
+
+.dashboard-link {
+  text-decoration: none;
+}
+
+.options-link {
+  text-decoration: none;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
 .activity-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -196,6 +226,172 @@ body {
   max-height: 680px;
   overflow-y: auto;
   padding: 2px;
+}
+
+.contributor-controls {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.contributor-controls label {
+  display: flex;
+  flex: 1;
+  min-width: 220px;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.contributor-controls .select {
+  width: 100%;
+}
+
+.contributor-controls > .btn {
+  min-height: 36px;
+  white-space: nowrap;
+}
+
+.contributor-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.contributor-stat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.contributor-stat strong {
+  font-size: 20px;
+}
+
+.contributor-stat span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.contributor-table-wrapper {
+  overflow-x: auto;
+}
+
+.contributor-table {
+  width: 100%;
+  border-collapse: collapse;
+  white-space: nowrap;
+}
+
+.contributor-table th,
+.contributor-table td {
+  padding: var(--spacing-md);
+  border-bottom: 1px solid var(--color-border);
+  text-align: right;
+}
+
+.contributor-table th:first-child,
+.contributor-table td:first-child {
+  text-align: left;
+}
+
+.contributor-table thead th {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.contributor-sort-btn {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.contributor-sort-btn::after {
+  content: ' ↕';
+  color: var(--color-text-muted);
+}
+
+.contributor-sort-btn.active {
+  color: var(--color-text);
+}
+
+.contributor-sort-btn.active::after {
+  content: ' ↓';
+}
+
+.contributor-sort-btn.active[aria-sort="ascending"]::after {
+  content: ' ↑';
+}
+
+.contributor-table tbody th {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.contributor-table tbody th a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--color-text-link);
+  text-decoration: none;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.contributor-table tbody th a::after {
+  content: '↗';
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  opacity: 0;
+  transform: translate(-2px, 2px);
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.contributor-table tbody th a:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.contributor-table tbody th a:hover::after,
+.contributor-table tbody th a:focus-visible::after {
+  opacity: 1;
+  transform: translate(0, 0);
+}
+
+.contributor-table tbody th a:focus-visible {
+  outline: 2px solid var(--color-text-link);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+.contributor-table tbody tr:hover {
+  background-color: var(--color-surface-hover);
+}
+
+.contributor-branch-count {
+  color: var(--color-text-link);
+  text-decoration: underline dotted;
+}
+
+.contributor-branch-count:focus {
+  outline: 2px solid var(--color-text-link);
+  outline-offset: 2px;
 }
 
 .activity-item {
@@ -751,8 +947,28 @@ input::placeholder {
 
 .repo-actions {
   display: flex;
+  align-items: center;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
   margin-bottom: var(--spacing-md);
+}
+
+.repo-sort-control {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  margin-right: auto;
+}
+
+.repo-sort-control .filter-label {
+  margin-right: 0;
+}
+
+.repo-sort-control .select {
+  min-height: 30px;
+  padding-top: var(--spacing-xs);
+  padding-bottom: var(--spacing-xs);
+  font-size: 12px;
 }
 
 .repo-filters {

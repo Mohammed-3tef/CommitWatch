@@ -41,6 +41,7 @@ const elements = {
   
   // Main view elements
   settingsBtn: document.getElementById('settings-btn'),
+  dashboardBtn: document.getElementById('dashboard-btn'),
   themeToggleBtn: document.getElementById('theme-toggle-btn'),
   userAvatar: document.getElementById('user-avatar'),
   gitlabUserAvatar: document.getElementById('gitlab-user-avatar'),
@@ -686,6 +687,10 @@ function handleOpenSettings() {
   chrome.runtime.openOptionsPage();
 }
 
+function handleOpenDashboard() {
+  chrome.tabs.create({ url: chrome.runtime.getURL('options/dashboard.html') });
+}
+
 // =============================================================================
 // INITIALIZATION
 // =============================================================================
@@ -730,6 +735,7 @@ async function init() {
   elements.checkNowBtn.addEventListener('click', handleCheckNow);
   elements.clearActivityBtn.addEventListener('click', handleClearActivity);
   elements.settingsBtn.addEventListener('click', handleOpenSettings);
+  elements.dashboardBtn.addEventListener('click', handleOpenDashboard);
   elements.themeToggleBtn.addEventListener('click', toggleTheme);
   
   // Set up platform filter buttons

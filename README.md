@@ -40,6 +40,7 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 - **Release & Tag notifications** - monitors GitHub Releases, GitLab Releases, and Git tags
 - **Native notifications** - PR/MR reviews, mentions, CI failures, security alerts (GitHub & GitLab)
 - **Recent Activity feed** - unified view of all commits, releases, and notifications, filterable by platform
+- **Repository Contributor Insights** - compare commit activity, change volume, priority, and last activity by contributor for a selected repository
 
 ### 🎯 Intelligent Priority Classification
 
@@ -81,6 +82,9 @@ A Chrome Extension (Manifest v3) that intelligently monitors **GitHub and GitLab
 - **Change size analysis** - Detects large refactors and breaking changes
 - **Notification history** - Stores the last 1,000 notifications with full details
 - **Activity history backfill** - Silently imports the last 7, 30, or 90 days of default-branch commits into the Activity Dashboard
+- **Repository contributor analytics** - summarizes locally stored commits by contributor with repository and period filters plus CSV export
+- **All-branch contributor history** - loads historical commits from every branch of a selected repository into the contributor dashboard
+- **Automatic all-branch history** - when all-branch monitoring is enabled, refreshes branch history for all monitored repositories in the background
 - **Badge counter** - Shows unread count on extension icon
 
 ## 📦 Installation
@@ -139,7 +143,7 @@ Create a new token at [gitlab.com/-/profile/personal_access_tokens](https://gitl
 | Enable Notifications | Receive Chrome notifications for all activity | ✅ On |
 | Release Notifications | Monitor GitHub & GitLab Releases and Git tags | ✅ On |
 | Check Frequency | How often to poll for commits/releases | 5 minutes |
-| Commit Branches | Monitor the main/master branch or all branches | Main/master branch |
+| Commit Branches | Monitor the repository default branch or all branches | Default branch |
 | Ignore Forks | Don't monitor forked repositories | ✅ On |
 | Ignore Own Commits | Don't notify for your commits | ❌ Off |
 | Per-Repo Toggle | Enable/disable individual repositories | All enabled |
@@ -169,6 +173,8 @@ CommitWatch/
 │   └── popup.css          # Popup styles
 ├── options/
 │   ├── options.html       # Settings page markup
+│   ├── dashboard.html     # Activity and analytics dashboard page markup
+│   ├── dashboard.js       # Dashboard state, rendering, and event handlers
 │   ├── options.js         # Settings interactions (GitHub & GitLab tokens)
 │   └── options.css        # Settings styles
 ├── icons/
